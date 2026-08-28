@@ -21,7 +21,7 @@
         <p>Accès réservé à l'administrateur du quiz</p>
         <div class="pwd-wrap">
             <input type="password" id="admin-pwd" placeholder="Mot de passe admin..." />
-            <button type="button" class="pwd-toggle" id="pwd-toggle-btn" aria-label="Afficher/masquer le mot de passe">
+            <button type="button" class="pwd-toggle" id="pwd-toggle-btn" aria-label="Afficher/masquer">
                 <span class="material-symbols-outlined" id="pwd-toggle-icon">visibility</span>
             </button>
         </div>
@@ -223,17 +223,26 @@
                     <span class="material-symbols-outlined">analytics</span>
                     Analyse des réponses
                 </div>
-                <select class="filter-select" id="filter-missed-domain">
-                    <option value="">Tous les domaines</option>
-                    <option value="informatique">Informatique</option>
-                    <option value="droit">Droit</option>
-                    <option value="medecine">Médecine</option>
-                    <option value="capitales_pays">Capitales & Pays</option>
-                    <option value="culture_generale">Culture générale</option>
-                    <option value="langues">Langues</option>
-                    <option value="psychologie">Psychologie</option>
-                    <option value="astronomie">Astronomie</option>
-                </select>
+                <div class="filter-bar">
+                    <select class="filter-select" id="filter-missed-domain">
+                        <option value="">Tous les domaines</option>
+                        <option value="informatique">Informatique</option>
+                        <option value="droit">Droit</option>
+                        <option value="medecine">Médecine</option>
+                        <option value="capitales_pays">Capitales & Pays</option>
+                        <option value="culture_generale">Culture générale</option>
+                        <option value="langues">Langues</option>
+                        <option value="psychologie">Psychologie</option>
+                        <option value="astronomie">Astronomie</option>
+                    </select>
+                    <select class="filter-select" id="filter-missed-niveau">
+                        <option value="">Tous les niveaux</option>
+                        <option value="débutant">Débutant</option>
+                        <option value="intermédiaire">Intermédiaire</option>
+                        <option value="avancé">Avancé</option>
+                        <option value="aléatoire">Aléatoire</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Onglets -->

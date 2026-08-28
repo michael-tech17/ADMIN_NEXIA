@@ -59,7 +59,7 @@ document.getElementById('admin-pwd').addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
 });
 
-// Toggle afficher/masquer mot de passe
+// Bouton afficher / masquer mot de passe
 document.getElementById('pwd-toggle-btn').addEventListener('click', () => {
     const input = document.getElementById('admin-pwd');
     const icon  = document.getElementById('pwd-toggle-icon');
@@ -610,11 +610,13 @@ document.querySelectorAll('.missed-tab').forEach(btn => {
 });
 
 document.getElementById('filter-missed-domain').addEventListener('change', renderMissed);
+document.getElementById('filter-missed-niveau').addEventListener('change', renderMissed);
 
 // ── RENDU ANALYSE DES RÉPONSES ────────────────────────────────────
 function renderMissed() {
     const list   = document.getElementById('missed-list');
     const domain = document.getElementById('filter-missed-domain').value;
+    const niveau = document.getElementById('filter-missed-niveau').value;
 
     if (allReponses.length === 0) {
         list.innerHTML = `<li class="empty-msg">
@@ -625,8 +627,10 @@ function renderMissed() {
         return;
     }
 
-    // Filtrer par domaine
-    let data = domain ? allReponses.filter(r => r.domain === domain) : allReponses;
+    // Filtrer par domaine et niveau
+    let data = allReponses;
+    if (domain) data = data.filter(r => r.domain === domain);
+    if (niveau) data = data.filter(r => (r.niveau || r.level || '') === niveau);
 
     // Filtrer par résultat selon l'onglet actif
     const resultatFiltre = currentTab === 'ratees' ? 'incorrect'
