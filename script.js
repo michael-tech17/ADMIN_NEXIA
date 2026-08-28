@@ -116,6 +116,7 @@ async function loadAllData() {
             'Mis à jour à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
         renderKPIs();
+        renderFrequentation();
         renderDomains();
         renderPays();
         applyFilters();
@@ -126,6 +127,174 @@ async function loadAllData() {
     }
 
     document.getElementById('btn-refresh').querySelector('.material-symbols-outlined').style.animation = '';
+}
+
+// ── FRÉQUENTATION ────────────────────────────────────────────────
+let currentFreqPeriod = 'day';
+
+// Initialiser les onglets de période
+document.querySelectorAll('.freq-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentFreqPeriod = btn.dataset.period;
+        document.querySelectorAll('.freq-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderFrequentation();
+    });
+});
+
+function getDateBounds(period) {
+    const now   = new Date();
+    const start = new Date();
+
+    if (period === 'day') {
+        start.setHours(0, 0, 0, 0);
+    } else if (period === 'week') {
+        const day = start.getDay(); // 0=dim
+        start.setDate(start.getDate() - ((day + 6) % 7)); // lundi
+        start.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+    } else if (period === 'year') {
+        start.setMonth(0, 1);
+        start.setHours(0, 0, 0, 0);
+    } else {
+        return null; // 'all'
+    }
+    return { start, end: now };
+}
+
+function filterByPeriod(scores, period) {
+    const bounds = getDateBounds(period);
+    if (!bounds) return scores;
+    return scores.filter(s => {
+        if (!s.ts) return false;
+        const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+        return d >= bounds.start && d <= bounds.end;
+    });
+}
+
+function renderFrequentation() {
+    if (allScores.length === 0) return;
+
+    const filtered = filterByPeriod(allScores, currentFreqPeriod);
+
+    // KPIs fréquentation
+    document.getElementById('freq-parties').textContent = filtered.length.toLocaleString('fr');
+    const uniques = new Set(filtered.map(s => (s.name || '').toLowerCase())).size;
+    document.getElementById('freq-joueurs').textContent = uniques.toLocaleString('fr');
+    const moyPct = filtered.length
+        ? Math.round(filtered.reduce((a, s) => a + (parseInt(s.pct) || 0), 0) / filtered.length)
+        : 0;
+    document.getElementById('freq-score').textContent = filtered.length ? moyPct + '%' : '—';
+    const pays = new Set(filtered.filter(s => s.countryCode).map(s => s.countryCode)).size;
+    document.getElementById('freq-pays').textContent = pays || '—';
+
+    // Graphe barres
+    renderFreqChart();
+}
+
+function renderFreqChart() {
+    const barsEl = document.getElementById('freq-bars');
+    const titleEl = document.getElementById('freq-chart-title');
+
+    // Construire les buckets selon la période
+    let buckets = [];
+
+    if (currentFreqPeriod === 'day') {
+        // 24 heures
+        titleEl.textContent = "Activité par heure aujourd'hui";
+        const now = new Date();
+        for (let h = 0; h <= now.getHours(); h++) {
+            const label = h + 'h';
+            const count = allScores.filter(s => {
+                if (!s.ts) return false;
+                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                return d.toDateString() === now.toDateString() && d.getHours() === h;
+            }).length;
+            buckets.push({ label, count });
+        }
+    } else if (currentFreqPeriod === 'week') {
+        titleEl.textContent = 'Activité des 7 derniers jours';
+        const jours = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const label = jours[(d.getDay() + 6) % 7];
+            const count = allScores.filter(s => {
+                if (!s.ts) return false;
+                const sd = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                return sd.toDateString() === d.toDateString();
+            }).length;
+            buckets.push({ label, count });
+        }
+    } else if (currentFreqPeriod === 'month') {
+        titleEl.textContent = 'Activité par semaine ce mois';
+        const now = new Date();
+        const year = now.getFullYear(), month = now.getMonth();
+        // Semaines du mois (S1..S5)
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let w = 1; w <= 5; w++) {
+            const from = (w - 1) * 7 + 1;
+            const to   = Math.min(w * 7, daysInMonth);
+            if (from > daysInMonth) break;
+            const label = 'S' + w;
+            const count = allScores.filter(s => {
+                if (!s.ts) return false;
+                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                return d.getFullYear() === year && d.getMonth() === month
+                    && d.getDate() >= from && d.getDate() <= to;
+            }).length;
+            buckets.push({ label, count });
+        }
+    } else if (currentFreqPeriod === 'year') {
+        titleEl.textContent = 'Activité par mois cette année';
+        const mois = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+        const year = new Date().getFullYear();
+        const nowMonth = new Date().getMonth();
+        for (let m = 0; m <= nowMonth; m++) {
+            const label = mois[m];
+            const count = allScores.filter(s => {
+                if (!s.ts) return false;
+                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                return d.getFullYear() === year && d.getMonth() === m;
+            }).length;
+            buckets.push({ label, count });
+        }
+    } else {
+        // all — par année
+        titleEl.textContent = 'Activité par année (total)';
+        const years = {};
+        allScores.forEach(s => {
+            if (!s.ts) return;
+            const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+            const y = d.getFullYear();
+            years[y] = (years[y] || 0) + 1;
+        });
+        Object.keys(years).sort().forEach(y => {
+            buckets.push({ label: y, count: years[y] });
+        });
+    }
+
+    if (buckets.length === 0) {
+        barsEl.innerHTML = `<div class="empty-msg" style="padding:20px 0;width:100%">
+            <span class="material-symbols-outlined" style="animation:none;font-size:28px">bar_chart_off</span>
+            Aucune donnée pour cette période.
+        </div>`;
+        return;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+
+    barsEl.innerHTML = buckets.map(b => {
+        const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
+        return `<div class="freq-bar-col">
+            <div class="freq-bar-count">${b.count > 0 ? b.count : ''}</div>
+            <div class="freq-bar" style="height:${pct}%" title="${b.label} : ${b.count} partie(s)"></div>
+            <div class="freq-bar-label">${b.label}</div>
+        </div>`;
+    }).join('');
 }
 
 // ── KPI ───────────────────────────────────────────────────────────

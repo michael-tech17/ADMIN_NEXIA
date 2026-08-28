@@ -80,6 +80,67 @@
             </div>
         </div>
 
+        <!-- Fréquentation -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">trending_up</span>
+            Fréquentation
+        </div>
+        <div class="frequentation-section" id="frequentation-section">
+
+            <!-- Onglets période -->
+            <div class="freq-tabs">
+                <button class="freq-tab active" data-period="day">Aujourd'hui</button>
+                <button class="freq-tab" data-period="week">Cette semaine</button>
+                <button class="freq-tab" data-period="month">Ce mois</button>
+                <button class="freq-tab" data-period="year">Cette année</button>
+                <button class="freq-tab" data-period="all">Total</button>
+            </div>
+
+            <!-- Cartes visiteurs / participants -->
+            <div class="freq-cards" id="freq-cards">
+                <div class="freq-card">
+                    <div class="freq-icon visitors"><span class="material-symbols-outlined">visibility</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Parties jouées</div>
+                        <div class="freq-value" id="freq-parties">—</div>
+                        <div class="freq-sub" id="freq-parties-sub">sur la période sélectionnée</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon players"><span class="material-symbols-outlined">group</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Joueurs distincts</div>
+                        <div class="freq-value" id="freq-joueurs">—</div>
+                        <div class="freq-sub" id="freq-joueurs-sub">noms différents</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon avg"><span class="material-symbols-outlined">avg_pace</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Score moyen</div>
+                        <div class="freq-value" id="freq-score">—</div>
+                        <div class="freq-sub">sur la période</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon trend"><span class="material-symbols-outlined">show_chart</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Pays actifs</div>
+                        <div class="freq-value" id="freq-pays">—</div>
+                        <div class="freq-sub">pays différents</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini-graphe activité (barres) -->
+            <div class="freq-chart-wrap">
+                <div class="freq-chart-title" id="freq-chart-title">Activité des 7 derniers jours</div>
+                <div class="freq-bars" id="freq-bars">
+                    <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Stats par domaine -->
         <div class="section-title">
             <span class="material-symbols-outlined">bar_chart</span>

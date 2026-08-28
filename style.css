@@ -379,8 +379,8 @@
 
         .score-table {
             width: 100%;
-            min-width: 500px;
             border-collapse: collapse;
+            table-layout: auto;
         }
 
         .score-table th {
@@ -393,6 +393,7 @@
             color: var(--text-muted);
             background: var(--bg-element);
             border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
         }
 
         .score-table td {
@@ -598,6 +599,169 @@
             text-align: right;
         }
 
+        /* ── FRÉQUENTATION ───────────────────────── */
+        .frequentation-section {
+            background: var(--bg-container);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 32px;
+            overflow: hidden;
+        }
+
+        .freq-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .freq-tab {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px 16px;
+            border: none;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .freq-tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            font-weight: 700;
+            background: var(--primary-light);
+        }
+
+        .freq-tab:hover:not(.active) { background: var(--bg-element); }
+
+        .freq-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .freq-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 24px;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .freq-card:last-child { border-right: none; }
+
+        .freq-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .freq-icon .material-symbols-outlined { font-size: 22px; }
+
+        .freq-icon.visitors { background: var(--primary-light); color: var(--primary); }
+        .freq-icon.players  { background: var(--success-light); color: var(--success); }
+        .freq-icon.avg      { background: var(--warning-light); color: var(--warning); }
+        .freq-icon.trend    { background: #ede9fe; color: #7c3aed; }
+
+        .freq-info { display: flex; flex-direction: column; gap: 2px; }
+
+        .freq-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+
+        .freq-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.1;
+        }
+
+        .freq-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Graphe barres */
+        .freq-chart-wrap {
+            padding: 20px 24px;
+        }
+
+        .freq-chart-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .freq-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            height: 100px;
+        }
+
+        .freq-bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .freq-bar-count {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .freq-bar {
+            width: 100%;
+            background: var(--primary);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+            transition: height 0.4s ease;
+            opacity: 0.85;
+        }
+
+        .freq-bar:hover { opacity: 1; }
+
+        .freq-bar-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        @media (max-width: 700px) {
+            .freq-cards { grid-template-columns: repeat(2, 1fr); }
+            .freq-card { padding: 14px 16px; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .freq-card:nth-child(odd) { border-right: 1px solid var(--border-color); }
+            .freq-card:last-child, .freq-card:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+            .freq-value { font-size: 22px; }
+            .freq-bars { gap: 3px; }
+            .freq-bar-count { font-size: 9px; }
+        }
+
         /* ── LOADING / EMPTY ─────────────────────── */
         .loading-msg, .empty-msg {
             text-align: center;
@@ -620,31 +784,30 @@
 
         /* ── RESPONSIVE ──────────────────────────── */
 
-        /* Tablette (max 1024px) */
+        /* Tablette large (max 1024px) */
         @media (max-width: 1024px) {
             main { max-width: 100%; padding: 24px 20px; }
             .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
             .domains-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
         }
 
-        /* Mobile large (max 700px) */
-        @media (max-width: 700px) {
+        /* Tablette portrait (max 768px) */
+        @media (max-width: 768px) {
             /* Header */
-            header { padding: 0 14px; height: auto; flex-wrap: wrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
-            .header-left h1 { font-size: 15px; }
-            .header-left .badge { font-size: 10px; padding: 2px 6px; }
-            .header-right { gap: 8px; flex-wrap: wrap; }
+            header { padding: 0 16px; height: auto; flex-wrap: wrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+            .header-left h1 { font-size: 16px; }
+            .header-right { gap: 8px; }
             .btn-refresh span:not(.material-symbols-outlined),
             .btn-logout span:not(.material-symbols-outlined) { display: none; }
             .btn-refresh, .btn-logout { padding: 7px 10px; }
             .last-update { font-size: 11px; width: 100%; order: 3; }
 
             /* Main */
-            main { padding: 16px 10px; }
+            main { padding: 16px 12px; }
 
             /* KPI */
             .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
-            .kpi-value { font-size: 24px; }
+            .kpi-value { font-size: 26px; }
             .kpi-card { padding: 14px 16px; }
 
             /* Domaines */
@@ -652,18 +815,71 @@
 
             /* Leaderboard header */
             .leaderboard-header { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 16px; }
-            .filter-bar { width: 100%; }
-            .filter-select { flex: 1; min-width: 0; font-size: 12px; padding: 6px 8px; }
+            .filter-bar { width: 100%; flex-wrap: wrap; }
+            .filter-select { flex: 1; min-width: 120px; font-size: 12px; padding: 6px 8px; }
 
-            /* Table : masquer colonnes Domaine, Niveau, Date */
-            .score-table th:nth-child(4),
-            .score-table td:nth-child(4),
-            .score-table th:nth-child(5),
-            .score-table td:nth-child(5),
-            .score-table th:nth-child(6),
-            .score-table td:nth-child(6) { display: none; }
-            .score-table th, .score-table td { padding: 10px 10px; font-size: 13px; }
-            .player-cell { gap: 7px; }
+            /* Table classement — affichage carte sur mobile */
+            .score-table thead { display: none; }
+            .score-table, .score-table tbody, .score-table tr, .score-table td {
+                display: block;
+                width: 100%;
+            }
+            .score-table tr {
+                border-bottom: 1px solid var(--border-color);
+                padding: 14px 16px;
+                display: grid;
+                grid-template-columns: 44px 1fr auto;
+                grid-template-rows: auto auto auto;
+                column-gap: 12px;
+                row-gap: 4px;
+                align-items: center;
+            }
+            .score-table tr:last-child { border-bottom: none; }
+            .score-table tr:hover { background: var(--bg-element); }
+            .score-table td {
+                border: none;
+                padding: 0;
+                font-size: 13px;
+            }
+            /* Rang — colonne 1, s'étend sur toutes les lignes */
+            .score-table td:nth-child(1) {
+                grid-column: 1;
+                grid-row: 1 / 4;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            /* Joueur — colonne 2, ligne 1 */
+            .score-table td:nth-child(2) {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            /* Score — colonne 3, ligne 1 */
+            .score-table td:nth-child(3) {
+                grid-column: 3;
+                grid-row: 1;
+                text-align: right;
+            }
+            /* Domaine — colonne 2–3, ligne 2 */
+            .score-table td:nth-child(4) {
+                grid-column: 2 / 4;
+                grid-row: 2;
+                color: var(--text-muted);
+                font-size: 12px;
+            }
+            /* Niveau — colonne 2, ligne 3 */
+            .score-table td:nth-child(5) {
+                grid-column: 2;
+                grid-row: 3;
+            }
+            /* Date — colonne 3, ligne 3 */
+            .score-table td:nth-child(6) {
+                grid-column: 3;
+                grid-row: 3;
+                text-align: right;
+                font-size: 11px;
+                color: var(--text-muted);
+            }
 
             /* Pays grid */
             #pays-grid { grid-template-columns: 1fr !important; }
@@ -677,14 +893,48 @@
             /* Pagination */
             .pagination { gap: 4px; padding: 12px 10px; flex-wrap: wrap; }
             .page-btn { padding: 5px 9px; font-size: 12px; }
+
+            /* Fréquentation */
+            .freq-cards { grid-template-columns: repeat(2, 1fr); }
+            .freq-card { padding: 14px 16px; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .freq-card:nth-child(odd) { border-right: 1px solid var(--border-color); }
+            .freq-value { font-size: 22px; }
         }
 
-        /* Mobile petit (max 400px) */
-        @media (max-width: 400px) {
-            .kpi-grid { grid-template-columns: 1fr; }
-            .filter-bar { flex-direction: column; }
+        /* Mobile (max 480px) */
+        @media (max-width: 480px) {
+            header { padding: 0 12px; }
+            main { padding: 12px 8px; }
+
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .kpi-value { font-size: 22px; }
+            .kpi-card { padding: 12px 14px; }
+
+            .filter-bar { flex-direction: column; gap: 6px; }
             .filter-select { width: 100%; }
-            .score-table th:nth-child(3),
-            .score-table td:nth-child(3) { font-size: 11px; }
+
+            /* Table : format carte encore plus compact */
+            .score-table tr {
+                padding: 12px 12px;
+                grid-template-columns: 36px 1fr auto;
+                column-gap: 8px;
+            }
+            .rank-medal { font-size: 15px; }
+            .player-cell { gap: 6px; }
+            .player-cell .player-flag { width: 16px; height: 11px; }
+
+            .missed-rank { font-size: 16px; min-width: 26px; }
+            .missed-question { font-size: 13px; }
+
             .login-box { padding: 28px 20px; }
+            .freq-bars { gap: 2px; }
+        }
+
+        /* Mobile très petit (max 360px) */
+        @media (max-width: 360px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .freq-cards { grid-template-columns: 1fr; }
+            .freq-card { border-right: none !important; }
+            .score-table tr { padding: 10px 10px; }
+            .header-left .badge { display: none; }
         }
