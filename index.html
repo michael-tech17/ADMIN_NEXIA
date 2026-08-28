@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexia — Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!--  ÉCRAN DE CONNEXION ADMIN                         -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="login-admin">
+    <div class="login-box">
+        <span class="material-symbols-outlined">admin_panel_settings</span>
+        <h1>Nexia — Admin</h1>
+        <p>Accès réservé à l'administrateur du quiz</p>
+        <input type="password" id="admin-pwd" placeholder="Mot de passe admin..." />
+        <button id="admin-login-btn">Se connecter</button>
+        <p class="login-error" id="login-error">Mot de passe incorrect.</p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!--  DASHBOARD ADMIN                                  -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="dashboard">
+
+    <header>
+        <div class="header-left">
+            <span class="material-symbols-outlined">school</span>
+            <h1>Nexia</h1>
+            <span class="badge">Admin</span>
+        </div>
+        <div class="header-right">
+            <span class="last-update" id="last-update">—</span>
+            <button class="btn-refresh" id="btn-refresh">
+                <span class="material-symbols-outlined">refresh</span>
+                Actualiser
+            </button>
+            <button class="btn-logout" id="btn-logout">
+                <span class="material-symbols-outlined">logout</span>
+                Déconnexion
+            </button>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- KPI -->
+        <div class="kpi-grid" id="kpi-grid">
+            <div class="kpi-card primary">
+                <div class="kpi-label"><span class="material-symbols-outlined">sports_esports</span> Parties jouées</div>
+                <div class="kpi-value" id="kpi-joueurs">—</div>
+                <div class="kpi-sub">Depuis le lancement du quiz</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-label"><span class="material-symbols-outlined">person</span> Joueurs distincts</div>
+                <div class="kpi-value" id="kpi-uniques">—</div>
+                <div class="kpi-sub">Noms différents enregistrés</div>
+            </div>
+            <div class="kpi-card warning">
+                <div class="kpi-label"><span class="material-symbols-outlined">leaderboard</span> Score moyen</div>
+                <div class="kpi-value" id="kpi-score-moyen">—</div>
+                <div class="kpi-sub">Sur toutes les parties</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label"><span class="material-symbols-outlined">emoji_events</span> Meilleur score</div>
+                <div class="kpi-value" id="kpi-best">—</div>
+                <div class="kpi-sub" id="kpi-best-name">—</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label"><span class="material-symbols-outlined">public</span> Pays représentés</div>
+                <div class="kpi-value" id="kpi-pays">—</div>
+                <div class="kpi-sub">Pays différents dans le classement</div>
+            </div>
+        </div>
+
+        <!-- Stats par domaine -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">bar_chart</span>
+            Parties par domaine
+        </div>
+        <div class="domains-grid" id="domains-grid">
+            <div class="loading-msg">
+                <span class="material-symbols-outlined">autorenew</span>
+                Chargement…
+            </div>
+        </div>
+
+        <!-- Classement global -->
+        <div class="leaderboard-section">
+            <div class="leaderboard-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">military_tech</span>
+                    Classement global
+                </div>
+                <div class="filter-bar">
+                    <select class="filter-select" id="filter-domain">
+                        <option value="">Tous les domaines</option>
+                        <option value="informatique">Informatique</option>
+                        <option value="droit">Droit</option>
+                        <option value="medecine">Médecine</option>
+                        <option value="capitales_pays">Capitales & Pays</option>
+                        <option value="culture_generale">Culture générale</option>
+                        <option value="langues">Langues</option>
+                        <option value="psychologie">Psychologie</option>
+                        <option value="astronomie">Astronomie</option>
+                    </select>
+                    <select class="filter-select" id="filter-niveau">
+                        <option value="">Tous les niveaux</option>
+                        <option value="débutant">Débutant</option>
+                        <option value="intermédiaire">Intermédiaire</option>
+                        <option value="avancé">Avancé</option>
+                        <option value="aléatoire">Aléatoire</option>
+                    </select>
+                    <select class="filter-select" id="filter-periode">
+                        <option value="all">Toute la période</option>
+                        <option value="today">Aujourd'hui</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="month">Ce mois</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="table-container">
+                <div class="loading-msg">
+                    <span class="material-symbols-outlined">autorenew</span>
+                    Chargement du classement…
+                </div>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- Pays qui jouent -->
+        <div class="leaderboard-section" style="margin-bottom:32px">
+            <div class="leaderboard-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">public</span>
+                    Pays qui jouent au quiz
+                </div>
+            </div>
+            <div id="pays-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+        </div>
+
+        <!-- Analyse des réponses -->
+        <div class="missed-section">
+            <div class="missed-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">analytics</span>
+                    Analyse des réponses
+                </div>
+                <select class="filter-select" id="filter-missed-domain">
+                    <option value="">Tous les domaines</option>
+                    <option value="informatique">Informatique</option>
+                    <option value="droit">Droit</option>
+                    <option value="medecine">Médecine</option>
+                    <option value="capitales_pays">Capitales & Pays</option>
+                    <option value="culture_generale">Culture générale</option>
+                    <option value="langues">Langues</option>
+                    <option value="psychologie">Psychologie</option>
+                    <option value="astronomie">Astronomie</option>
+                </select>
+            </div>
+
+            <!-- Onglets -->
+            <div style="display:flex;gap:0;border-bottom:1px solid var(--border-color);">
+                <button class="missed-tab active" data-tab="ratees" style="flex:1;padding:12px;border:none;border-bottom:2px solid var(--primary);background:var(--primary-light);color:var(--primary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">cancel</span>
+                    Questions ratées
+                </button>
+                <button class="missed-tab" data-tab="reussies" style="flex:1;padding:12px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--text-muted);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">check_circle</span>
+                    Questions réussies
+                </button>
+                <button class="missed-tab" data-tab="timeout" style="flex:1;padding:12px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--text-muted);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">timer_off</span>
+                    Temps écoulé
+                </button>
+            </div>
+
+            <ul class="missed-list" id="missed-list">
+                <li class="loading-msg">
+                    <span class="material-symbols-outlined">autorenew</span>
+                    Chargement…
+                </li>
+            </ul>
+        </div>
+
+    </main>
+</div>
+
+<script type="module" src="script.js"></script>
+
+</body>
+</html>
