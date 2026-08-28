@@ -1,8 +1,8 @@
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-import { getFirestore, collection, query, orderBy, getDocs, where, limit }
+import { getFirestore, collection, query, orderBy, getDocs, where, limit, getDoc, doc }
                            from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
-// ── 1. CONFIG FIREBASE (identique à script.js) ──────────────────────
+// ── CONFIG FIREBASE (identique à script.js) ──────────────────────
 const firebaseConfig = {
     apiKey:            "AIzaSyDoGmIzJVldQn9GugOX3ip75BCES9h2kIg",
     authDomain:        "quiz-multi-domaines.firebaseapp.com",
@@ -15,11 +15,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
-// ── 2. MOT DE PASSE ADMIN ───────────────────────────────────────────
-// ⚠️ CHANGE CE MOT DE PASSE avant de mettre en ligne !
-const ADMIN_PASSWORD = "FMK_Liverpool225";
+// ── MOT DE PASSE ADMIN ───────────────────────────────────────────
+// Le mot de passe est stocké dans Firestore : collection "config" > document "admin" > champ "password"
+// Il n'est jamais visible dans le code source.
 
-// ── 3. ÉTAT ─────────────────────────────────────────────────────────
+// ── ÉTAT ─────────────────────────────────────────────────────────
 let allScores      = [];
 let filteredScores = [];
 let currentPage    = 1;
@@ -53,22 +53,44 @@ const DOMAINE_ICONS = {
     astronomie:       "rocket_launch",
 };
 
-// ── 4. LOGIN ─────────────────────────────────────────────────────────
+// ── LOGIN ─────────────────────────────────────────────────────────
 document.getElementById('admin-login-btn').addEventListener('click', handleLogin);
 document.getElementById('admin-pwd').addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
 });
 
-function handleLogin() {
-    const pwd = document.getElementById('admin-pwd').value;
-    if (pwd === ADMIN_PASSWORD) {
-        document.getElementById('login-admin').style.display = 'none';
-        document.getElementById('dashboard').style.display = 'block';
-        loadAllData();
-    } else {
-        document.getElementById('login-error').style.display = 'block';
-        document.getElementById('admin-pwd').value = '';
+async function handleLogin() {
+    const pwd     = document.getElementById('admin-pwd').value.trim();
+    const btn     = document.getElementById('admin-login-btn');
+    const errEl   = document.getElementById('login-error');
+
+    if (!pwd) return;
+
+    // Afficher un état de chargement pendant la vérification Firebase
+    btn.textContent = 'Vérification…';
+    btn.disabled    = true;
+    errEl.style.display = 'none';
+
+    try {
+        const snap = await getDoc(doc(db, 'config', 'admin'));
+        const adminPassword = snap.exists() ? snap.data().password : null;
+
+        if (adminPassword && pwd === adminPassword) {
+            document.getElementById('login-admin').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            loadAllData();
+        } else {
+            errEl.style.display = 'block';
+            document.getElementById('admin-pwd').value = '';
+        }
+    } catch (e) {
+        console.error('Erreur vérification mot de passe :', e);
+        errEl.textContent  = 'Erreur de connexion. Réessayez.';
+        errEl.style.display = 'block';
     }
+
+    btn.textContent = 'Se connecter';
+    btn.disabled    = false;
 }
 
 document.getElementById('btn-logout').addEventListener('click', () => {
@@ -79,7 +101,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 
 document.getElementById('btn-refresh').addEventListener('click', loadAllData);
 
-// ── 5. CHARGEMENT FIREBASE ───────────────────────────────────────────
+// ── CHARGEMENT FIREBASE ───────────────────────────────────────────
 async function loadAllData() {
     document.getElementById('btn-refresh').querySelector('.material-symbols-outlined').style.animation = 'spin 1s linear infinite';
 
@@ -106,7 +128,7 @@ async function loadAllData() {
     document.getElementById('btn-refresh').querySelector('.material-symbols-outlined').style.animation = '';
 }
 
-// ── 6. KPI ───────────────────────────────────────────────────────────
+// ── KPI ───────────────────────────────────────────────────────────
 function renderKPIs() {
     document.getElementById('kpi-joueurs').textContent = allScores.length.toLocaleString('fr');
 
@@ -125,7 +147,7 @@ function renderKPIs() {
     }
 }
 
-// ── 7. PAYS ─────────────────────────────────────────────────────────
+// ── PAYS ─────────────────────────────────────────────────────────
 function renderPays() {
     const grid = document.getElementById('pays-grid');
     if (!grid) return;
@@ -183,7 +205,7 @@ function renderPays() {
     }).join('');
 }
 
-// ── 8. DOMAINES ──────────────────────────────────────────────────────
+// ── DOMAINES ──────────────────────────────────────────────────────
 function renderDomains() {
     const grid = document.getElementById('domains-grid');
 
@@ -232,7 +254,7 @@ function renderDomains() {
     }).join('');
 }
 
-// ── 9. FILTRES ───────────────────────────────────────────────────────
+// ── FILTRES ───────────────────────────────────────────────────────
 ['filter-domain', 'filter-niveau', 'filter-periode'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
         currentPage = 1;
@@ -261,7 +283,7 @@ function applyFilters() {
     renderPagination();
 }
 
-// ── 10. TABLE ─────────────────────────────────────────────────────────
+// ── TABLE ─────────────────────────────────────────────────────────
 function flagUrl(code) {
     return `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
 }
@@ -337,7 +359,7 @@ function renderTable() {
     </table>`;
 }
 
-// ── 11. PAGINATION ────────────────────────────────────────────────────
+// ── PAGINATION ────────────────────────────────────────────────────
 function renderPagination() {
     const total = Math.ceil(filteredScores.length / PAGE_SIZE);
     const pg    = document.getElementById('pagination');
@@ -374,7 +396,7 @@ function renderPagination() {
     });
 }
 
-// ── 12. DONNÉES RÉPONSES ──────────────────────────────────────────────
+// ── DONNÉES RÉPONSES ──────────────────────────────────────────────
 let allReponses  = [];
 let currentTab   = 'ratees';
 
@@ -390,7 +412,7 @@ async function loadReponses() {
     }
 }
 
-// ── 13. ONGLETS ANALYSE ───────────────────────────────────────────────
+// ── ONGLETS ANALYSE ───────────────────────────────────────────────
 document.querySelectorAll('.missed-tab').forEach(btn => {
     btn.addEventListener('click', () => {
         currentTab = btn.dataset.tab;
@@ -407,7 +429,7 @@ document.querySelectorAll('.missed-tab').forEach(btn => {
 
 document.getElementById('filter-missed-domain').addEventListener('change', renderMissed);
 
-// ── 14. RENDU ANALYSE DES RÉPONSES ────────────────────────────────────
+// ── RENDU ANALYSE DES RÉPONSES ────────────────────────────────────
 function renderMissed() {
     const list   = document.getElementById('missed-list');
     const domain = document.getElementById('filter-missed-domain').value;
