@@ -59,6 +59,19 @@ document.getElementById('admin-pwd').addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
 });
 
+// Toggle afficher/masquer mot de passe
+document.getElementById('pwd-toggle-btn').addEventListener('click', () => {
+    const input = document.getElementById('admin-pwd');
+    const icon  = document.getElementById('pwd-toggle-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+    } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+    }
+});
+
 async function handleLogin() {
     const pwd     = document.getElementById('admin-pwd').value.trim();
     const btn     = document.getElementById('admin-login-btn');

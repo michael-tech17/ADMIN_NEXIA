@@ -19,7 +19,12 @@
         <span class="material-symbols-outlined">admin_panel_settings</span>
         <h1>Nexia — Admin</h1>
         <p>Accès réservé à l'administrateur du quiz</p>
-        <input type="password" id="admin-pwd" placeholder="Mot de passe admin..." />
+        <div class="pwd-wrap">
+            <input type="password" id="admin-pwd" placeholder="Mot de passe admin..." />
+            <button type="button" class="pwd-toggle" id="pwd-toggle-btn" aria-label="Afficher/masquer le mot de passe">
+                <span class="material-symbols-outlined" id="pwd-toggle-icon">visibility</span>
+            </button>
+        </div>
         <button id="admin-login-btn">Se connecter</button>
         <p class="login-error" id="login-error">Mot de passe incorrect.</p>
     </div>
