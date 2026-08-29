@@ -48,7 +48,7 @@
             text-align: center;
         }
 
-        /* Icône du shield — uniquement celle du header login, pas le toggle */
+        /* Icône shield — uniquement l'enfant direct, pas l'icône du toggle */
         .login-box > .material-symbols-outlined {
             font-size: 48px;
             color: var(--primary);
@@ -76,7 +76,7 @@
             align-items: center;
         }
 
-        /* Supprimer le bouton natif Edge / IE */
+        /* Supprime le bouton natif Edge / IE */
         .pwd-wrap input::-ms-reveal,
         .pwd-wrap input::-ms-clear { display: none; }
 
@@ -96,7 +96,7 @@
             border-color: var(--primary);
         }
 
-        /* Bouton œil — centré absolument dans le wrapper */
+        /* Bouton œil — centré, transparent, sans héritage bleu */
         .pwd-toggle {
             position: absolute;
             right: 12px;
@@ -117,7 +117,7 @@
             line-height: 1;
         }
 
-        .pwd-toggle:hover { color: var(--primary); background: transparent !important; }
+        .pwd-toggle:hover { color: var(--primary); }
 
         .pwd-toggle .material-symbols-outlined {
             font-size: 20px !important;
@@ -127,7 +127,7 @@
             color: inherit;
         }
 
-        /* Bouton Se connecter — ciblé seul, jamais le toggle */
+        /* Bouton Se connecter uniquement */
         #admin-login-btn {
             width: 100%;
             padding: 12px;
@@ -464,7 +464,7 @@
         .rank-medal.gold   { color: #f59e0b; }
         .rank-medal.silver { color: #94a3b8; }
         .rank-medal.bronze { color: #b45309; }
-        .rank-medal.other  { color: var(--text-muted); font-size: 14px; }
+        .rank-medal.other  { color: var(--text-main); font-size: 14px; }
 
         .player-cell {
             display: flex;

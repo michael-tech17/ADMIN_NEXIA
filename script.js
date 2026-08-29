@@ -59,7 +59,6 @@ document.getElementById('admin-pwd').addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
 });
 
-// Bouton afficher / masquer mot de passe
 document.getElementById('pwd-toggle-btn').addEventListener('click', () => {
     const input = document.getElementById('admin-pwd');
     const icon  = document.getElementById('pwd-toggle-icon');
@@ -361,30 +360,40 @@ function renderPays() {
     }
 
     const maxCount = sorted[0].count;
-    grid.innerHTML = sorted.map((p, i) => {
+    const rows = sorted.map((p, i) => {
         const pct = Math.round((p.count / maxCount) * 100);
-        let medal = '';
-        if (i === 0) medal = '🥇';
-        else if (i === 1) medal = '🥈';
-        else if (i === 2) medal = '🥉';
 
-        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bg-element);">
-            <img src="https://flagcdn.com/w40/${p.code.toLowerCase()}.png"
-                 alt="${p.name}"
-                 style="width:32px;height:22px;object-fit:cover;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,0.15);flex-shrink:0">
-            <div style="flex:1">
-                <div style="font-size:14px;font-weight:600;">
-                    ${medal} ${p.name}
+        let rankHtml;
+        if      (i === 0) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">military_tech</span>1er</span>`;
+        else if (i === 1) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">workspace_premium</span>2e</span>`;
+        else if (i === 2) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
+        else              rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${i + 1}</span>`;
+
+        return `<tr>
+            <td>${rankHtml}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <img src="https://flagcdn.com/w40/${p.code.toLowerCase()}.png"
+                         alt="${p.name}"
+                         style="width:32px;height:22px;object-fit:cover;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,0.15);flex-shrink:0">
+                    <strong>${p.name}</strong>
                 </div>
-                <div style="height:5px;background:var(--bg-element);border-radius:3px;margin-top:5px;overflow:hidden">
-                    <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:3px;transition:width 0.6s ease"></div>
+            </td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div style="flex:1;height:5px;background:var(--bg-element);border-radius:3px;overflow:hidden;min-width:80px">
+                        <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:3px;transition:width 0.6s ease"></div>
+                    </div>
+                    <span style="font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap">${p.count} partie${p.count > 1 ? 's' : ''}</span>
                 </div>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:var(--primary);flex-shrink:0">
-                ${p.count} partie${p.count > 1 ? 's' : ''}
-            </div>
-        </div>`;
+            </td>
+        </tr>`;
     }).join('');
+
+    grid.innerHTML = `<table class="score-table" style="width:100%">
+        <thead><tr><th>#</th><th>Pays</th><th>Activité</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // ── DOMAINES ──────────────────────────────────────────────────────
@@ -455,11 +464,20 @@ function applyFilters() {
     filteredScores = allScores.filter(s => {
         if (domain && s.domain !== domain) return false;
         if (niveau && s.niveau !== niveau) return false;
-        if (periode === 'today'  && (now - s.ts) > day)      return false;
-        if (periode === 'week'   && (now - s.ts) > 7 * day)  return false;
-        if (periode === 'month'  && (now - s.ts) > 30 * day) return false;
+        if (periode !== 'all' && s.ts) {
+            const tsMs = s.ts.toDate ? s.ts.toDate().getTime() : new Date(s.ts).getTime();
+            if (periode === 'today' && (now - tsMs) > day)       return false;
+            if (periode === 'week'  && (now - tsMs) > 7 * day)   return false;
+            if (periode === 'month' && (now - tsMs) > 30 * day)  return false;
+        }
         return true;
-    }).sort((a, b) => (parseInt(b.pct) || 0) - (parseInt(a.pct) || 0) || a.ts - b.ts);
+    }).sort((a, b) => {
+        const pctDiff = (parseInt(b.pct) || 0) - (parseInt(a.pct) || 0);
+        if (pctDiff !== 0) return pctDiff;
+        const aTs = a.ts ? (a.ts.toDate ? a.ts.toDate().getTime() : new Date(a.ts).getTime()) : 0;
+        const bTs = b.ts ? (b.ts.toDate ? b.ts.toDate().getTime() : new Date(b.ts).getTime()) : 0;
+        return aTs - bTs;
+    });
 
     renderTable();
     renderPagination();
@@ -486,10 +504,10 @@ function renderTable() {
     const rows = page.map((s, i) => {
         const rank       = start + i + 1;
         let rankHtml;
-        if      (rank === 1) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">emoji_events</span>1er</span>`;
-        else if (rank === 2) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">emoji_events</span>2e</span>`;
-        else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">emoji_events</span>3e</span>`;
-        else                 rankHtml = `<span class="rank-medal other">#${rank}</span>`;
+        if      (rank === 1) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">military_tech</span>1er</span>`;
+        else if (rank === 2) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">workspace_premium</span>2e</span>`;
+        else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
+        else                 rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${rank}</span>`;
 
         // Drapeau depuis Firebase (champs countryCode / countryName sauvegardés à chaque partie)
         let flagHtml    = '';
@@ -588,6 +606,24 @@ async function loadReponses() {
             query(collection(db, "Reponses"), orderBy("ts", "desc"))
         );
         allReponses = snap.docs.map(d => d.data());
+
+        // ── DIAGNOSTIC : affiche la structure des 3 premiers docs ──
+        if (allReponses.length > 0) {
+            console.group('🔍 Structure des documents Reponses (3 premiers)');
+            allReponses.slice(0, 3).forEach((r, i) => {
+                console.log(`Doc ${i + 1} :`, JSON.stringify(r, null, 2));
+            });
+            // Lister tous les champs trouvés
+            const allKeys = new Set(allReponses.flatMap(r => Object.keys(r)));
+            console.log('📋 Tous les champs trouvés :', [...allKeys].join(', '));
+            // Lister les valeurs uniques pour domain, sub, niveau, level, difficulty
+            ['domain','sub','niveau','level','difficulty','niveauChoisi','resultat'].forEach(k => {
+                const vals = [...new Set(allReponses.map(r => r[k]).filter(v => v !== undefined))];
+                if (vals.length) console.log(`  → ${k} :`, vals.join(' | '));
+            });
+            console.groupEnd();
+        }
+
         renderMissed();
     } catch(e) {
         console.warn("Erreur chargement Reponses :", e);
@@ -616,7 +652,7 @@ document.getElementById('filter-missed-niveau').addEventListener('change', rende
 function renderMissed() {
     const list   = document.getElementById('missed-list');
     const domain = document.getElementById('filter-missed-domain').value;
-    const niveau = document.getElementById('filter-missed-niveau').value;
+    const niveau = document.getElementById('filter-missed-niveau') ? document.getElementById('filter-missed-niveau').value : '';
 
     if (allReponses.length === 0) {
         list.innerHTML = `<li class="empty-msg">
@@ -627,10 +663,32 @@ function renderMissed() {
         return;
     }
 
-    // Filtrer par domaine et niveau
+    // ── Filtrer sur les données BRUTES (avant regroupement) ──────────
     let data = allReponses;
-    if (domain) data = data.filter(r => r.domain === domain);
-    if (niveau) data = data.filter(r => (r.niveau || r.level || '') === niveau);
+
+    // Domaine : chercher dans tous les champs possibles, insensible à la casse
+    if (domain) {
+        const d = domain.toLowerCase();
+        data = data.filter(r =>
+            (r.domain        || '').toLowerCase() === d ||
+            (r.sub           || '').toLowerCase() === d ||
+            (r.domaine       || '').toLowerCase() === d ||
+            (r.categorie     || '').toLowerCase() === d ||
+            (r.category      || '').toLowerCase() === d
+        );
+    }
+
+    // Niveau : chercher dans tous les champs possibles, insensible à la casse
+    if (niveau) {
+        const n = niveau.toLowerCase();
+        data = data.filter(r =>
+            (r.niveau        || '').toLowerCase() === n ||
+            (r.level         || '').toLowerCase() === n ||
+            (r.difficulty    || '').toLowerCase() === n ||
+            (r.niveauChoisi  || '').toLowerCase() === n ||
+            (r.niveauJeu     || '').toLowerCase() === n
+        );
+    }
 
     // Filtrer par résultat selon l'onglet actif
     const resultatFiltre = currentTab === 'ratees' ? 'incorrect'
@@ -647,25 +705,36 @@ function renderMissed() {
         return;
     }
 
-    // Regrouper par question
+    // Regrouper par question — on stocke aussi le niveau
     const parQuestion = {};
     data.forEach(r => {
         const key = r.question;
+        // Résoudre le niveau depuis tous les champs possibles
+        const niveauDoc = r.niveau || r.level || r.difficulty || r.niveauChoisi || r.niveauJeu || '';
+        // Résoudre le domaine affiché depuis tous les champs possibles
+        const domainDoc = r.domain || r.domaine || r.category || r.categorie || '';
+        const subDoc    = r.sub || '';
+
         if (!parQuestion[key]) {
             parQuestion[key] = {
                 question: r.question,
-                domain:   r.domain,
-                sub:      r.sub,
+                domain:   domainDoc,
+                sub:      subDoc,
+                niveau:   niveauDoc,
                 options:  r.options || [],
-                reponseCorrecte: r.reponseCorrecte,
+                reponseCorrecte: r.reponseCorrecte || r.bonneReponse || r.correctAnswer || '',
                 count:    0,
-                optionsChoisies: {} // option → count
+                optionsChoisies: {}
             };
         }
         parQuestion[key].count++;
-        if (r.optionChoisie) {
-            const oc = r.optionChoisie;
-            parQuestion[key].optionsChoisies[oc] = (parQuestion[key].optionsChoisies[oc] || 0) + 1;
+        // Récupérer le niveau dès qu'un doc du groupe l'a
+        if (!parQuestion[key].niveau && niveauDoc) {
+            parQuestion[key].niveau = niveauDoc;
+        }
+        const optChoisie = r.optionChoisie || r.reponseChoisie || r.choix || r.selectedAnswer || '';
+        if (optChoisie) {
+            parQuestion[key].optionsChoisies[optChoisie] = (parQuestion[key].optionsChoisies[optChoisie] || 0) + 1;
         }
     });
 
@@ -680,20 +749,29 @@ function renderMissed() {
                        : 'var(--warning)';
     const labelSuffix  = currentTab === 'ratees'   ? 'fois ratée'
                        : currentTab === 'reussies' ? 'fois réussie'
-                       : 'fois timeout';
+                       : 'fois en timeout';
+
+    // Badge couleur par niveau
+    const niveauClasse = { 'débutant': 'debutant', 'intermédiaire': 'intermediaire', 'avancé': 'avance', 'aléatoire': 'aleatoire' };
+    const niveauLabel  = { 'débutant': 'Débutant', 'intermédiaire': 'Intermédiaire', 'avancé': 'Avancé', 'aléatoire': 'Aléatoire' };
 
     list.innerHTML = sorted.map((q, i) => {
-        const domNom = NOM_DOMAINES[q.sub || q.domain] || NOM_DOMAINES[q.domain] || q.domain;
+        const domNom  = NOM_DOMAINES[q.sub || q.domain] || NOM_DOMAINES[q.domain] || q.domain;
+        const nivCls  = niveauClasse[q.niveau] || '';
+        const nivLbl  = niveauLabel[q.niveau]  || q.niveau;
+        const niveauBadge = nivLbl
+            ? `<span class="niveau-chip ${nivCls}" style="font-size:11px">${nivLbl}</span>`
+            : '';
 
-        // Construire les barres d'options choisies
+        // Construire les barres d'options choisies (pour tous les onglets)
         let optionsBarsHtml = '';
-        if (currentTab === 'ratees' && Object.keys(q.optionsChoisies).length > 0) {
+        if (Object.keys(q.optionsChoisies).length > 0) {
             const maxOpts = Math.max(...Object.values(q.optionsChoisies));
             const lignes  = Object.entries(q.optionsChoisies)
                 .sort((a, b) => b[1] - a[1])
                 .map(([opt, cnt]) => {
                     const pct      = Math.round((cnt / maxOpts) * 100);
-                    const isCorr   = opt === q.reponseCorrecte;
+                    const isCorr = currentTab === 'reussies' || opt === q.reponseCorrecte;
                     const labelCls = isCorr ? 'correct-opt' : 'wrong-opt';
                     const barCls   = isCorr ? 'correct-fill' : 'wrong-fill';
                     return `<div class="option-bar-row">
@@ -707,19 +785,11 @@ function renderMissed() {
                     </div>`;
                 }).join('');
             optionsBarsHtml = `<div class="option-bar-wrap">${lignes}</div>`;
-        }
-
-        if (currentTab === 'timeout') {
-            // Pour timeout : pas d'option choisie, juste la bonne réponse
+        } else if (q.reponseCorrecte) {
+            // Pas de détail des options mais on affiche au moins la bonne réponse
+            const label = currentTab === 'timeout' ? 'Bonne réponse' : 'Réponse correcte';
             optionsBarsHtml = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted);">
-                Bonne réponse : <strong style="color:var(--success)">${q.reponseCorrecte}</strong>
-            </div>`;
-        }
-
-        if (currentTab === 'reussies') {
-            // Pour réussies : afficher la bonne réponse
-            optionsBarsHtml = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted);">
-                Réponse correcte : <strong style="color:var(--success)">${q.reponseCorrecte}</strong>
+                ${label} : <strong style="color:var(--success)">${q.reponseCorrecte}</strong>
             </div>`;
         }
 
@@ -731,7 +801,8 @@ function renderMissed() {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:80px">
                 <span class="missed-domain">${domNom}</span>
-                <span class="missed-pct" style="color:${couleurCount}">${q.count} ${labelSuffix}${q.count > 1 ? 's' : ''}</span>
+                ${niveauBadge}
+                <span class="missed-pct" style="color:${couleurCount}">${q.count}× ${labelSuffix}</span>
             </div>
         </li>`;
     }).join('');
