@@ -11,9 +11,6 @@
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════ -->
-<!--  ÉCRAN DE CONNEXION ADMIN                         -->
-<!-- ══════════════════════════════════════════════════ -->
 <div id="login-admin">
     <div class="login-box">
         <span class="material-symbols-outlined">admin_panel_settings</span>
@@ -30,9 +27,6 @@
     </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════ -->
-<!--  DASHBOARD ADMIN                                  -->
-<!-- ══════════════════════════════════════════════════ -->
 <div id="dashboard">
 
     <header>
@@ -92,7 +86,6 @@
         </div>
         <div class="frequentation-section" id="frequentation-section">
 
-            <!-- Onglets période -->
             <div class="freq-tabs">
                 <button class="freq-tab active" data-period="day">Aujourd'hui</button>
                 <button class="freq-tab" data-period="week">Cette semaine</button>
@@ -101,7 +94,6 @@
                 <button class="freq-tab" data-period="all">Total</button>
             </div>
 
-            <!-- Cartes visiteurs / participants -->
             <div class="freq-cards" id="freq-cards">
                 <div class="freq-card">
                     <div class="freq-icon visitors"><span class="material-symbols-outlined">visibility</span></div>
@@ -137,11 +129,12 @@
                 </div>
             </div>
 
-            <!-- Mini-graphe activité (barres) -->
             <div class="freq-chart-wrap">
                 <div class="freq-chart-title" id="freq-chart-title">Activité des 7 derniers jours</div>
-                <div class="freq-bars" id="freq-bars">
-                    <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                <div class="freq-bars-scroll-wrap" id="freq-bars-scroll-wrap">
+                    <div class="freq-bars" id="freq-bars">
+                        <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -217,6 +210,69 @@
             </div>
         </div>
 
+        <!-- ══ PROFIL DES JOUEURS ══ -->
+        <div class="leaderboard-section" style="margin-bottom:32px">
+            <div class="leaderboard-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">manage_accounts</span>
+                    Profil des joueurs
+                </div>
+                <div class="filter-bar">
+                    <select class="filter-select" id="filter-profil-tri">
+                        <option value="parties">Trier par nb de parties</option>
+                        <option value="score">Trier par score moyen</option>
+                        <option value="meilleur">Trier par meilleur score</option>
+                    </select>
+                    <select class="filter-select" id="filter-profil-domaine">
+                        <option value="">Tous les domaines favoris</option>
+                        <option value="informatique">Informatique</option>
+                        <option value="droit">Droit</option>
+                        <option value="medecine">Médecine</option>
+                        <option value="capitales_pays">Capitales & Pays</option>
+                        <option value="culture_generale">Culture générale</option>
+                        <option value="langues">Langues</option>
+                        <option value="psychologie">Psychologie</option>
+                        <option value="astronomie">Astronomie</option>
+                        <option value="dinosaures">Dinosaures & Préhistoire</option>
+                    </select>
+                    <select class="filter-select" id="filter-profil-niveau">
+                        <option value="">Tous les niveaux favoris</option>
+                        <option value="débutant">Débutant</option>
+                        <option value="intermédiaire">Intermédiaire</option>
+                        <option value="avancé">Avancé</option>
+                        <option value="aléatoire">Aléatoire</option>
+                    </select>
+                </div>
+            </div>
+            <div id="profil-container">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+            <div class="pagination" id="pagination-profil"></div>
+        </div>
+
+        <!-- ══ JOUEURS INACTIFS ══ -->
+        <div class="leaderboard-section" style="margin-bottom:32px">
+            <div class="leaderboard-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">person_off</span>
+                    Joueurs qui ne jouent plus
+                </div>
+                <div class="filter-bar">
+                    <select class="filter-select" id="filter-inactif-seuil">
+                        <option value="7">Absents depuis 7 jours</option>
+                        <option value="14">Absents depuis 14 jours</option>
+                        <option value="30" selected>Absents depuis 30 jours</option>
+                        <option value="60">Absents depuis 60 jours</option>
+                        <option value="90">Absents depuis 90 jours</option>
+                    </select>
+                </div>
+            </div>
+            <div id="inactifs-container">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+            <div class="pagination" id="pagination-inactifs"></div>
+        </div>
+
         <!-- Analyse des réponses -->
         <div class="missed-section">
             <div class="missed-header">
@@ -247,7 +303,6 @@
                 </div>
             </div>
 
-            <!-- Onglets -->
             <div style="display:flex;gap:0;border-bottom:1px solid var(--border-color);">
                 <button class="missed-tab active" data-tab="ratees" style="flex:1;padding:12px;border:none;border-bottom:2px solid var(--primary);background:var(--primary-light);color:var(--primary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">
                     <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">cancel</span>

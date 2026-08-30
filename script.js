@@ -133,6 +133,8 @@ async function loadAllData() {
         renderFrequentation();
         renderDomains();
         renderPays();
+        renderInactifs();
+        renderProfilJoueurs();
         applyFilters();
         await loadReponses();
 
@@ -216,17 +218,17 @@ function renderFreqChart() {
     let buckets = [];
 
     if (currentFreqPeriod === 'day') {
-        // 24 heures
+        // Toujours afficher les 24h complètes (0h → 23h)
         titleEl.textContent = "Activité par heure aujourd'hui";
         const now = new Date();
-        for (let h = 0; h <= now.getHours(); h++) {
+        for (let h = 0; h < 24; h++) {
             const label = h + 'h';
             const count = allScores.filter(s => {
                 if (!s.ts) return false;
                 const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
                 return d.toDateString() === now.toDateString() && d.getHours() === h;
             }).length;
-            buckets.push({ label, count });
+            buckets.push({ label, count, isFuture: h > now.getHours() });
         }
     } else if (currentFreqPeriod === 'week') {
         titleEl.textContent = 'Activité des 7 derniers jours';
@@ -301,11 +303,24 @@ function renderFreqChart() {
 
     const maxCount = Math.max(...buckets.map(b => b.count), 1);
 
+    // Pour le mode 24h, on force une largeur min par colonne pour le scroll horizontal
+    const is24h = currentFreqPeriod === 'day';
+    const scrollWrap = document.getElementById('freq-bars-scroll-wrap');
+    if (scrollWrap) {
+        scrollWrap.style.overflowX = is24h ? 'auto' : 'visible';
+        scrollWrap.style.webkitOverflowScrolling = is24h ? 'touch' : '';
+        barsEl.style.minWidth = is24h ? (buckets.length * 36) + 'px' : '';
+    }
+
     barsEl.innerHTML = buckets.map(b => {
         const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
-        return `<div class="freq-bar-col">
-            <div class="freq-bar-count">${b.count > 0 ? b.count : ''}</div>
-            <div class="freq-bar" style="height:${pct}%" title="${b.label} : ${b.count} partie(s)"></div>
+        const isFuture = b.isFuture || false;
+        const barStyle = isFuture
+            ? `height:${Math.max(pct,0)}%;opacity:0.18;background:var(--border-color)`
+            : `height:${pct}%`;
+        return `<div class="freq-bar-col${isFuture ? ' freq-bar-future' : ''}">
+            <div class="freq-bar-count">${b.count > 0 && !isFuture ? b.count : ''}</div>
+            <div class="freq-bar" style="${barStyle}" title="${b.label} : ${isFuture ? 'à venir' : b.count + ' partie(s)'}"></div>
             <div class="freq-bar-label">${b.label}</div>
         </div>`;
     }).join('');
@@ -598,6 +613,174 @@ function renderPagination() {
     });
 }
 
+// ── JOUEURS INACTIFS ──────────────────────────────────────────────
+let inactifsPage = 1;
+const INACTIFS_PAGE_SIZE = 20;
+let inactifsData = [];
+
+document.getElementById('filter-inactif-seuil').addEventListener('change', () => {
+    inactifsPage = 1;
+    renderInactifs();
+});
+
+function renderInactifs() {
+    const seuilJours = parseInt(document.getElementById('filter-inactif-seuil').value) || 30;
+    const now = new Date();
+    const seuilMs = seuilJours * 24 * 60 * 60 * 1000;
+
+    // Regrouper les scores par joueur (nom normalisé)
+    const parJoueur = {};
+    allScores.forEach(s => {
+        const nom = (s.name || '').trim();
+        if (!nom) return;
+        const nomKey = nom.toLowerCase();
+        const ts = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+        if (!ts) return;
+
+        if (!parJoueur[nomKey]) {
+            parJoueur[nomKey] = {
+                nom,
+                countryCode: s.countryCode || '',
+                countryName: s.countryName || '',
+                dernierePartie: ts,
+                totalParties: 0,
+                meilleurScore: 0,
+                scoreTotal: 0,
+            };
+        }
+        parJoueur[nomKey].totalParties++;
+        const pctVal = parseInt(s.pct) || 0;
+        if (pctVal > parJoueur[nomKey].meilleurScore) parJoueur[nomKey].meilleurScore = pctVal;
+        parJoueur[nomKey].scoreTotal += pctVal;
+        if (ts > parJoueur[nomKey].dernierePartie) {
+            parJoueur[nomKey].dernierePartie = ts;
+            // Met à jour le pays avec la partie la plus récente
+            if (s.countryCode) {
+                parJoueur[nomKey].countryCode = s.countryCode;
+                parJoueur[nomKey].countryName = s.countryName || s.countryCode;
+            }
+        }
+    });
+
+    // Filtrer : joueurs dont la dernière partie est avant le seuil
+    inactifsData = Object.values(parJoueur)
+        .filter(j => (now - j.dernierePartie) >= seuilMs)
+        .sort((a, b) => b.dernierePartie - a.dernierePartie); // les plus récemment actifs en premier
+
+    renderInactifsTable();
+    renderInactifsPagination();
+}
+
+function joursDepuis(date) {
+    const diff = Date.now() - date.getTime();
+    const j = Math.floor(diff / (24 * 60 * 60 * 1000));
+    if (j < 30) return j + ' j';
+    if (j < 365) return Math.floor(j / 30) + ' mois';
+    return Math.floor(j / 365) + ' an' + (Math.floor(j / 365) > 1 ? 's' : '');
+}
+
+function renderInactifsTable() {
+    const container = document.getElementById('inactifs-container');
+    const start = (inactifsPage - 1) * INACTIFS_PAGE_SIZE;
+    const page  = inactifsData.slice(start, start + INACTIFS_PAGE_SIZE);
+
+    if (inactifsData.length === 0) {
+        container.innerHTML = `<div class="empty-msg">
+            <span class="material-symbols-outlined" style="animation:none">sentiment_satisfied</span>
+            Tous les joueurs sont actifs sur cette période !
+        </div>`;
+        return;
+    }
+
+    const rows = page.map((j, i) => {
+        const rank = start + i + 1;
+        let rankHtml;
+        if      (rank === 1) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">military_tech</span>1er</span>`;
+        else if (rank === 2) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">workspace_premium</span>2e</span>`;
+        else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
+        else                 rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${rank}</span>`;
+
+        let flagHtml = '';
+        let countryName = '';
+        if (j.countryCode) {
+            flagHtml    = `<img class="player-flag" src="https://flagcdn.com/w40/${j.countryCode.toLowerCase()}.png" alt="${j.countryName}" title="${j.countryName}">`;
+            countryName = j.countryName || '';
+        }
+
+        const moyScore  = j.totalParties ? Math.round(j.scoreTotal / j.totalParties) : 0;
+        const absence   = joursDepuis(j.dernierePartie);
+        const dateStr   = j.dernierePartie.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+
+        return `<tr>
+            <td>${rankHtml}</td>
+            <td>
+                <div class="player-cell">
+                    ${flagHtml}
+                    <div>
+                        <strong>${j.nom}</strong>
+                        ${countryName ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${countryName}</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="font-size:13px;font-weight:700;color:var(--primary)">${j.totalParties}</span></td>
+            <td style="text-align:center"><span class="score-pill ${moyScore >= 70 ? 'high' : moyScore >= 40 ? 'mid' : 'low'}">${moyScore}%</span></td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:12px;color:var(--text-muted)">${dateStr}</span>
+                    <span style="font-size:12px;font-weight:700;color:var(--error)">
+                        <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle">schedule</span>
+                        Absent depuis ${absence}
+                    </span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<table class="score-table" style="width:100%">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Joueur</th>
+                <th style="text-align:center">Parties</th>
+                <th style="text-align:center">Score moy.</th>
+                <th>Dernière activité</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderInactifsPagination() {
+    const total = Math.ceil(inactifsData.length / INACTIFS_PAGE_SIZE);
+    const pg    = document.getElementById('pagination-inactifs');
+    if (total <= 1) { pg.innerHTML = ''; return; }
+
+    let html = `<button class="page-btn" id="pg-inactifs-prev" ${inactifsPage === 1 ? 'disabled' : ''}>‹ Préc.</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - inactifsPage) <= 2) {
+            html += `<button class="page-btn ${i === inactifsPage ? 'active' : ''}" data-inactifs-page="${i}">${i}</button>`;
+        } else if (Math.abs(i - inactifsPage) === 3) {
+            html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+        }
+    }
+    html += `<button class="page-btn" id="pg-inactifs-next" ${inactifsPage === total ? 'disabled' : ''}>Suiv. ›</button>`;
+    pg.innerHTML = html;
+
+    pg.querySelectorAll('[data-inactifs-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            inactifsPage = parseInt(btn.dataset.inactifsPage);
+            renderInactifsTable();
+            renderInactifsPagination();
+        });
+    });
+    pg.querySelector('#pg-inactifs-prev')?.addEventListener('click', () => {
+        if (inactifsPage > 1) { inactifsPage--; renderInactifsTable(); renderInactifsPagination(); }
+    });
+    pg.querySelector('#pg-inactifs-next')?.addEventListener('click', () => {
+        if (inactifsPage < total) { inactifsPage++; renderInactifsTable(); renderInactifsPagination(); }
+    });
+}
+
 // ── DONNÉES RÉPONSES ──────────────────────────────────────────────
 let allReponses  = [];
 let currentTab   = 'ratees';
@@ -835,4 +1018,252 @@ function renderMissed() {
             </div>
         </li>`;
     }).join('');
+}
+// ── PROFIL DES JOUEURS (domaine & niveau favoris) ─────────────────
+let profilPage = 1;
+const PROFIL_PAGE_SIZE = 15;
+let profilData = [];
+
+document.getElementById('filter-profil-tri').addEventListener('change', () => {
+    profilPage = 1;
+    renderProfilJoueurs();
+});
+document.getElementById('filter-profil-domaine').addEventListener('change', () => {
+    profilPage = 1;
+    renderProfilJoueurs();
+});
+document.getElementById('filter-profil-niveau').addEventListener('change', () => {
+    profilPage = 1;
+    renderProfilJoueurs();
+});
+
+function renderProfilJoueurs() {
+    const triVal    = document.getElementById('filter-profil-tri').value;
+    const domFil    = document.getElementById('filter-profil-domaine').value;
+    const nivFil    = document.getElementById('filter-profil-niveau').value;
+
+    // ── 1. Regrouper tous les scores par joueur ──────────────────
+    const parJoueur = {};
+    allScores.forEach(s => {
+        const nom = (s.name || '').trim();
+        if (!nom) return;
+        const key = nom.toLowerCase();
+        const ts  = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+        const pct = parseInt(s.pct) || 0;
+        const dom = s.sub || s.domain || '';
+        const niv = s.niveau || '';
+
+        if (!parJoueur[key]) {
+            parJoueur[key] = {
+                nom,
+                countryCode : s.countryCode  || '',
+                countryName : s.countryName  || '',
+                totalParties: 0,
+                scoreTotal  : 0,
+                meilleurPct : 0,
+                domaines    : {},
+                niveaux     : {},
+                premierePartie: ts,
+                dernierePartie: ts,
+            };
+        }
+        const p = parJoueur[key];
+        p.totalParties++;
+        p.scoreTotal += pct;
+        if (pct > p.meilleurPct) p.meilleurPct = pct;
+        if (dom) p.domaines[dom] = (p.domaines[dom] || 0) + 1;
+        if (niv) p.niveaux[niv]  = (p.niveaux[niv]  || 0) + 1;
+        if (ts) {
+            if (!p.dernierePartie || ts > p.dernierePartie) {
+                p.dernierePartie = ts;
+                if (s.countryCode) { p.countryCode = s.countryCode; p.countryName = s.countryName || s.countryCode; }
+            }
+            if (!p.premierePartie || ts < p.premierePartie) p.premierePartie = ts;
+        }
+    });
+
+    // ── 2. Calculer les favoris pour chaque joueur ───────────────
+    const joueurs = Object.values(parJoueur).map(p => {
+        const domFavori = Object.keys(p.domaines).length
+            ? Object.keys(p.domaines).reduce((a, b) => p.domaines[a] >= p.domaines[b] ? a : b) : '';
+        const nivFavori = Object.keys(p.niveaux).length
+            ? Object.keys(p.niveaux).reduce((a, b) => p.niveaux[a] >= p.niveaux[b] ? a : b) : '';
+
+        // top 3 domaines avec leur %
+        const totalDom = Object.values(p.domaines).reduce((a, b) => a + b, 0) || 1;
+        const top3Dom  = Object.entries(p.domaines)
+            .sort((a, b) => b[1] - a[1]).slice(0, 3)
+            .map(([d, c]) => ({ dom: d, count: c, pct: Math.round((c / totalDom) * 100) }));
+
+        // distribution niveaux
+        const totalNiv = Object.values(p.niveaux).reduce((a, b) => a + b, 0) || 1;
+        const distribNiv = Object.entries(p.niveaux)
+            .sort((a, b) => b[1] - a[1])
+            .map(([n, c]) => ({ niv: n, count: c, pct: Math.round((c / totalNiv) * 100) }));
+
+        return {
+            ...p,
+            domFavori,
+            nivFavori,
+            top3Dom,
+            distribNiv,
+            scoreMoyen: p.totalParties ? Math.round(p.scoreTotal / p.totalParties) : 0,
+        };
+    });
+
+    // ── 3. Filtres domaine / niveau favori ───────────────────────
+    let filtered = joueurs;
+    if (domFil) filtered = filtered.filter(j => j.domFavori === domFil);
+    if (nivFil) filtered = filtered.filter(j => j.nivFavori === nivFil);
+
+    // ── 4. Tri ───────────────────────────────────────────────────
+    filtered.sort((a, b) => {
+        if (triVal === 'score')    return b.scoreMoyen    - a.scoreMoyen;
+        if (triVal === 'meilleur') return b.meilleurPct   - a.meilleurPct;
+        return b.totalParties - a.totalParties; // défaut : parties
+    });
+
+    profilData = filtered;
+    renderProfilTable();
+    renderProfilPagination();
+}
+
+const NIVEAU_CLS = { 'débutant':'debutant','intermédiaire':'intermediaire','avancé':'avance','aléatoire':'aleatoire' };
+const NIVEAU_LBL = { 'débutant':'Débutant','intermédiaire':'Intermédiaire','avancé':'Avancé','aléatoire':'Aléatoire' };
+
+function renderProfilTable() {
+    const container = document.getElementById('profil-container');
+    const start = (profilPage - 1) * PROFIL_PAGE_SIZE;
+    const page  = profilData.slice(start, start + PROFIL_PAGE_SIZE);
+
+    if (profilData.length === 0) {
+        container.innerHTML = `<div class="empty-msg">
+            <span class="material-symbols-outlined" style="animation:none">inbox</span>
+            Aucun joueur pour cette sélection.
+        </div>`;
+        return;
+    }
+
+    const rows = page.map((j, i) => {
+        const rank = start + i + 1;
+
+        // Médaille
+        let rankHtml;
+        if      (rank === 1) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">military_tech</span>1er</span>`;
+        else if (rank === 2) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">workspace_premium</span>2e</span>`;
+        else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
+        else                 rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${rank}</span>`;
+
+        // Drapeau
+        const flagHtml = j.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${j.countryCode.toLowerCase()}.png" alt="${j.countryName}" title="${j.countryName}">`
+            : '';
+
+        // Domaine favori + icône
+        const domIcon = DOMAINE_ICONS[j.domFavori] || 'category';
+        const domNom  = NOM_DOMAINES[j.domFavori]  || j.domFavori || '—';
+
+        // Top 3 domaines — mini barres
+        const top3Html = j.top3Dom.map(d => {
+            const dn = NOM_DOMAINES[d.dom] || d.dom;
+            const ic = DOMAINE_ICONS[d.dom] || 'category';
+            return `<div class="profil-dom-bar-row">
+                <span class="material-symbols-outlined" style="font-size:13px;color:var(--primary);flex-shrink:0">${ic}</span>
+                <span class="profil-dom-bar-label" title="${dn}">${dn}</span>
+                <div class="profil-dom-bar-bg">
+                    <div class="profil-dom-bar-fill" style="width:${d.pct}%"></div>
+                </div>
+                <span class="profil-dom-bar-pct">${d.count}×</span>
+            </div>`;
+        }).join('');
+
+        // Niveaux — chips avec %
+        const nivHtml = j.distribNiv.map(n => {
+            const cls = NIVEAU_CLS[n.niv] || '';
+            const lbl = NIVEAU_LBL[n.niv] || n.niv;
+            return `<span class="niveau-chip ${cls}" title="${n.count} partie(s)">${lbl} <span style="opacity:.7">${n.pct}%</span></span>`;
+        }).join(' ');
+
+        // Score moyen coloré
+        const sm = j.scoreMoyen;
+        const smCls = sm >= 70 ? 'high' : sm >= 40 ? 'mid' : 'low';
+
+        return `<tr class="profil-row">
+            <td>${rankHtml}</td>
+            <td>
+                <div class="player-cell">
+                    ${flagHtml}
+                    <div>
+                        <strong>${j.nom}</strong>
+                        ${j.countryName ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${j.countryName}</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary)">${domIcon}</span>
+                    <strong style="font-size:13px">${domNom}</strong>
+                </div>
+                <div class="profil-dom-bars">${top3Html}</div>
+            </td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:4px">${nivHtml || '—'}</div>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;font-weight:800;color:var(--primary)">${j.totalParties}</span>
+                <div style="font-size:11px;color:var(--text-muted)">partie${j.totalParties > 1 ? 's' : ''}</div>
+            </td>
+            <td style="text-align:center">
+                <span class="score-pill ${smCls}">${sm}%</span>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">🏆 ${j.meilleurPct}%</div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table class="score-table profil-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Joueur</th>
+                    <th>Domaines joués</th>
+                    <th>Niveaux</th>
+                    <th style="text-align:center">Parties</th>
+                    <th style="text-align:center">Score moy. / Meilleur</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>`;
+}
+
+function renderProfilPagination() {
+    const total = Math.ceil(profilData.length / PROFIL_PAGE_SIZE);
+    const pg    = document.getElementById('pagination-profil');
+    if (total <= 1) { pg.innerHTML = ''; return; }
+
+    let html = `<button class="page-btn" id="pg-profil-prev" ${profilPage === 1 ? 'disabled' : ''}>‹ Préc.</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - profilPage) <= 2) {
+            html += `<button class="page-btn ${i === profilPage ? 'active' : ''}" data-profil-page="${i}">${i}</button>`;
+        } else if (Math.abs(i - profilPage) === 3) {
+            html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+        }
+    }
+    html += `<button class="page-btn" id="pg-profil-next" ${profilPage === total ? 'disabled' : ''}>Suiv. ›</button>`;
+    pg.innerHTML = html;
+
+    pg.querySelectorAll('[data-profil-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            profilPage = parseInt(btn.dataset.profilPage);
+            renderProfilTable();
+            renderProfilPagination();
+        });
+    });
+    pg.querySelector('#pg-profil-prev')?.addEventListener('click', () => {
+        if (profilPage > 1) { profilPage--; renderProfilTable(); renderProfilPagination(); }
+    });
+    pg.querySelector('#pg-profil-next')?.addEventListener('click', () => {
+        if (profilPage < total) { profilPage++; renderProfilTable(); renderProfilPagination(); }
+    });
 }

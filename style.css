@@ -772,6 +772,18 @@
             margin-bottom: 14px;
         }
 
+        /* Wrapper scrollable pour le graphe heures (24 colonnes) */
+        .freq-bars-scroll-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+            /* scrollbar fine et discrète */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+        .freq-bars-scroll-wrap::-webkit-scrollbar { height: 4px; }
+        .freq-bars-scroll-wrap::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+
         .freq-bars {
             display: flex;
             align-items: flex-end;
@@ -781,6 +793,7 @@
 
         .freq-bar-col {
             flex: 1;
+            min-width: 28px;  /* largeur minimale pour que chaque heure soit lisible */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -807,6 +820,11 @@
 
         .freq-bar:hover { opacity: 1; }
 
+        /* Colonnes "heures futures" — grisées */
+        .freq-bar-future .freq-bar-label {
+            color: var(--text-disabled);
+        }
+
         .freq-bar-label {
             font-size: 10px;
             color: var(--text-muted);
@@ -825,6 +843,7 @@
             .freq-value { font-size: 22px; }
             .freq-bars { gap: 3px; }
             .freq-bar-count { font-size: 9px; }
+            .freq-bar-col { min-width: 26px; }
         }
 
         /* ── LOADING / EMPTY ─────────────────────── */
@@ -1002,4 +1021,66 @@
             .freq-card { border-right: none !important; }
             .score-table tr { padding: 10px 10px; }
             .header-left .badge { display: none; }
+        }
+        /* ── PROFIL JOUEURS ──────────────────────────────────────── */
+        .profil-table td {
+            vertical-align: top;
+            padding: 14px 16px;
+        }
+
+        /* Mini barres domaines dans le profil */
+        .profil-dom-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 2px;
+        }
+
+        .profil-dom-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .profil-dom-bar-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            width: 110px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profil-dom-bar-bg {
+            flex: 1;
+            height: 5px;
+            background: var(--bg-element);
+            border-radius: 3px;
+            overflow: hidden;
+            min-width: 40px;
+        }
+
+        .profil-dom-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .profil-dom-bar-pct {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            white-space: nowrap;
+            min-width: 24px;
+            text-align: right;
+        }
+
+        /* Ligne de tableau profil au hover */
+        .profil-row:hover td { background: var(--bg-element); }
+
+        /* Responsive profil */
+        @media (max-width: 768px) {
+            .profil-dom-bar-label { width: 80px; }
         }
