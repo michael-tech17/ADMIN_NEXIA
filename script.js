@@ -40,6 +40,7 @@ const NOM_DOMAINES = {
     pays:             "Drapeaux du monde",
     francais:         "Langue française",
     anglais:          "Langue anglaise",
+    dinosaures:       "Dinosaures & Préhistoire",
 };
 
 const DOMAINE_ICONS = {
@@ -51,6 +52,7 @@ const DOMAINE_ICONS = {
     langues:          "translate",
     psychologie:      "psychology",
     astronomie:       "rocket_launch",
+    dinosaures:       "skull",
 };
 
 // ── LOGIN ─────────────────────────────────────────────────────────
