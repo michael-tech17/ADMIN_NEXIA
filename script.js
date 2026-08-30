@@ -769,11 +769,29 @@ function renderMissed() {
         let optionsBarsHtml = '';
         if (Object.keys(q.optionsChoisies).length > 0) {
             const maxOpts = Math.max(...Object.values(q.optionsChoisies));
-            const lignes  = Object.entries(q.optionsChoisies)
+
+            // Normalisation pour comparaison robuste (casse + espaces)
+            const repCorrecteNorm = (q.reponseCorrecte || '').trim().toLowerCase();
+
+            const lignes = Object.entries(q.optionsChoisies)
                 .sort((a, b) => b[1] - a[1])
                 .map(([opt, cnt]) => {
-                    const pct      = Math.round((cnt / maxOpts) * 100);
-                    const isCorr = currentTab === 'reussies' || opt === q.reponseCorrecte;
+                    const pct = Math.round((cnt / maxOpts) * 100);
+
+                    // Dans l'onglet "ratées" : toutes les options choisies sont fausses
+                    // Dans l'onglet "réussies" : toutes les options choisies sont correctes
+                    // Dans l'onglet "timeout" : on marque en vert uniquement si c'est la bonne réponse
+                    let isCorr;
+                    if (currentTab === 'ratees') {
+                        isCorr = false; // jamais vert — toutes fausses par définition
+                    } else if (currentTab === 'reussies') {
+                        isCorr = true;  // toujours vert — toutes correctes par définition
+                    } else {
+                        // timeout : on compare proprement avec normalisation
+                        isCorr = repCorrecteNorm.length > 0 &&
+                                 opt.trim().toLowerCase() === repCorrecteNorm;
+                    }
+
                     const labelCls = isCorr ? 'correct-opt' : 'wrong-opt';
                     const barCls   = isCorr ? 'correct-fill' : 'wrong-fill';
                     return `<div class="option-bar-row">
@@ -786,7 +804,16 @@ function renderMissed() {
                         <span class="option-bar-count">${cnt}×</span>
                     </div>`;
                 }).join('');
-            optionsBarsHtml = `<div class="option-bar-wrap">${lignes}</div>`;
+
+            // Pour "ratées" et "timeout" : ajouter une ligne séparée pour la bonne réponse
+            let bonneReponseHtml = '';
+            if (currentTab !== 'reussies' && q.reponseCorrecte) {
+                bonneReponseHtml = `<div style="margin-top:6px;padding:4px 8px;background:var(--success-light);border-radius:6px;font-size:12px;color:var(--success);font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                    <span style="font-size:14px">✓</span> Bonne réponse : ${q.reponseCorrecte}
+                </div>`;
+            }
+
+            optionsBarsHtml = `<div class="option-bar-wrap">${lignes}</div>${bonneReponseHtml}`;
         } else if (q.reponseCorrecte) {
             // Pas de détail des options mais on affiche au moins la bonne réponse
             const label = currentTab === 'timeout' ? 'Bonne réponse' : 'Réponse correcte';
