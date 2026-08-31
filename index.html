@@ -77,6 +77,11 @@
                 <div class="kpi-value" id="kpi-pays">—</div>
                 <div class="kpi-sub">Pays différents dans le classement</div>
             </div>
+            <div class="kpi-card danger">
+                <div class="kpi-label"><span class="material-symbols-outlined">exit_to_app</span> Abandons</div>
+                <div class="kpi-value" id="kpi-abandons">—</div>
+                <div class="kpi-sub" id="kpi-abandons-sub">Quiz commencés mais non terminés</div>
+            </div>
         </div>
 
         <!-- Fréquentation -->
@@ -271,6 +276,47 @@
                 <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
             </div>
             <div class="pagination" id="pagination-inactifs"></div>
+        </div>
+
+        <!-- ══ JOUEURS QUI ONT ABANDONNÉ ══ -->
+        <div class="leaderboard-section" style="margin-bottom:32px">
+            <div class="leaderboard-header">
+                <div class="section-title" style="margin:0">
+                    <span class="material-symbols-outlined">exit_to_app</span>
+                    Joueurs qui ont abandonné
+                </div>
+                <div class="filter-bar">
+                    <select class="filter-select" id="filter-abandon-domaine">
+                        <option value="">Tous les domaines</option>
+                        <option value="informatique">Informatique</option>
+                        <option value="droit">Droit</option>
+                        <option value="medecine">Médecine</option>
+                        <option value="capitales_pays">Capitales &amp; Pays</option>
+                        <option value="culture_generale">Culture générale</option>
+                        <option value="langues">Langues</option>
+                        <option value="psychologie">Psychologie</option>
+                        <option value="astronomie">Astronomie</option>
+                        <option value="dinosaures">Dinosaures &amp; Préhistoire</option>
+                    </select>
+                    <select class="filter-select" id="filter-abandon-niveau">
+                        <option value="">Tous les niveaux</option>
+                        <option value="débutant">Débutant</option>
+                        <option value="intermédiaire">Intermédiaire</option>
+                        <option value="avancé">Avancé</option>
+                        <option value="aléatoire">Aléatoire</option>
+                    </select>
+                    <select class="filter-select" id="filter-abandon-periode">
+                        <option value="all">Toute la période</option>
+                        <option value="today">Aujourd'hui</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="month">Ce mois</option>
+                    </select>
+                </div>
+            </div>
+            <div id="abandons-container">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+            <div class="pagination" id="pagination-abandons"></div>
         </div>
 
         <!-- Analyse des réponses -->

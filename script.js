@@ -25,6 +25,10 @@ let filteredScores = [];
 let currentPage    = 1;
 const PAGE_SIZE    = 20;
 
+let allAbandons    = [];
+let abandonsPage   = 1;
+const ABANDONS_PAGE_SIZE = 20;
+
 const NOM_DOMAINES = {
     informatique:     "Informatique",
     droit:            "Droit",
@@ -136,6 +140,7 @@ async function loadAllData() {
         renderInactifs();
         renderProfilJoueurs();
         applyFilters();
+        await loadAbandons();
         await loadReponses();
 
     } catch(e) {
@@ -342,6 +347,22 @@ function renderKPIs() {
         const best = allScores.reduce((a, b) => (parseInt(b.pct) || 0) > (parseInt(a.pct) || 0) ? b : a);
         document.getElementById('kpi-best').textContent = best.pct + '%';
         document.getElementById('kpi-best-name').textContent = best.name + ' · ' + (NOM_DOMAINES[best.domain] || best.domain);
+    }
+
+    // KPI abandons — mis à jour après loadAbandons()
+    renderAbandonsKPI();
+}
+
+function renderAbandonsKPI() {
+    const kpiEl  = document.getElementById('kpi-abandons');
+    const subEl  = document.getElementById('kpi-abandons-sub');
+    if (!kpiEl) return;
+    kpiEl.textContent = allAbandons.length.toLocaleString('fr');
+    if (allAbandons.length > 0 && allScores.length > 0) {
+        const taux = Math.round((allAbandons.length / (allAbandons.length + allScores.length)) * 100);
+        subEl.textContent = `${taux}% des sessions commencées`;
+    } else {
+        subEl.textContent = 'Quiz commencés mais non terminés';
     }
 }
 
@@ -778,6 +799,173 @@ function renderInactifsPagination() {
     });
     pg.querySelector('#pg-inactifs-next')?.addEventListener('click', () => {
         if (inactifsPage < total) { inactifsPage++; renderInactifsTable(); renderInactifsPagination(); }
+    });
+}
+
+// ── ABANDONS ──────────────────────────────────────────────────────
+async function loadAbandons() {
+    try {
+        const snap = await getDocs(
+            query(collection(db, "Abandons"), orderBy("ts", "desc"))
+        );
+        allAbandons = snap.docs.map(d => d.data());
+        renderAbandonsKPI();
+        renderAbandons();
+    } catch(e) {
+        // Collection peut ne pas exister encore — afficher un message d'aide
+        allAbandons = [];
+        renderAbandonsKPI();
+        const container = document.getElementById('abandons-container');
+        if (container) {
+            container.innerHTML = `<div class="empty-msg" style="flex-direction:column;gap:10px;padding:32px 20px;text-align:center">
+                <span class="material-symbols-outlined" style="animation:none;font-size:36px;color:var(--warning)">info</span>
+                <strong style="color:var(--text-main)">Collection "Abandons" introuvable dans Firebase</strong>
+                <p style="font-size:13px;color:var(--text-muted);max-width:480px">
+                    Pour activer ce suivi, ajoutez dans votre quiz côté joueur un appel Firebase qui enregistre un document dans la collection <code>Abandons</code> lorsqu'un joueur quitte sans terminer.<br><br>
+                    Champs recommandés : <code>name</code>, <code>domain</code>, <code>niveau</code>, <code>ts</code> (timestamp), <code>countryCode</code>, <code>countryName</code>, <code>questionAtteinte</code>.
+                </p>
+            </div>`;
+        }
+    }
+}
+
+// Filtres abandons
+['filter-abandon-domaine', 'filter-abandon-niveau', 'filter-abandon-periode'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+        abandonsPage = 1;
+        renderAbandons();
+    });
+});
+
+function renderAbandons() {
+    const domFil    = document.getElementById('filter-abandon-domaine')?.value || '';
+    const nivFil    = document.getElementById('filter-abandon-niveau')?.value  || '';
+    const periodeV  = document.getElementById('filter-abandon-periode')?.value || 'all';
+    const now       = Date.now();
+    const day       = 24 * 60 * 60 * 1000;
+
+    let data = allAbandons.filter(a => {
+        if (domFil && (a.domain || '') !== domFil) return false;
+        if (nivFil && (a.niveau || '') !== nivFil) return false;
+        if (periodeV !== 'all' && a.ts) {
+            const tsMs = a.ts.toDate ? a.ts.toDate().getTime() : new Date(a.ts).getTime();
+            if (periodeV === 'today' && (now - tsMs) > day)      return false;
+            if (periodeV === 'week'  && (now - tsMs) > 7 * day)  return false;
+            if (periodeV === 'month' && (now - tsMs) > 30 * day) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('abandons-container');
+    const pg        = document.getElementById('pagination-abandons');
+
+    if (data.length === 0) {
+        container.innerHTML = `<div class="empty-msg">
+            <span class="material-symbols-outlined" style="animation:none">sentiment_satisfied</span>
+            Aucun abandon enregistré pour cette sélection.
+        </div>`;
+        pg.innerHTML = '';
+        return;
+    }
+
+    const total = Math.ceil(data.length / ABANDONS_PAGE_SIZE);
+    const start = (abandonsPage - 1) * ABANDONS_PAGE_SIZE;
+    const page  = data.slice(start, start + ABANDONS_PAGE_SIZE);
+
+    const niveauClasse = { 'débutant':'debutant','intermédiaire':'intermediaire','avancé':'avance','aléatoire':'aleatoire' };
+    const niveauLabel  = { 'débutant':'Débutant','intermédiaire':'Intermédiaire','avancé':'Avancé','aléatoire':'Aléatoire' };
+
+    const rows = page.map((a, i) => {
+        const rank = start + i + 1;
+        let rankHtml;
+        if      (rank === 1) rankHtml = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:18px">military_tech</span>1er</span>`;
+        else if (rank === 2) rankHtml = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:18px">workspace_premium</span>2e</span>`;
+        else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
+        else                 rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${rank}</span>`;
+
+        // Drapeau
+        let flagHtml = '';
+        if (a.countryCode) {
+            flagHtml = `<img class="player-flag" src="https://flagcdn.com/w40/${a.countryCode.toLowerCase()}.png" alt="${a.countryName || a.countryCode}" title="${a.countryName || a.countryCode}">`;
+        }
+
+        const domNom = NOM_DOMAINES[a.sub || a.domain] || NOM_DOMAINES[a.domain] || a.domain || '—';
+        const niv    = a.niveau || '';
+        const nivCls = niveauClasse[niv] || '';
+        const nivLbl = niveauLabel[niv]  || niv;
+
+        // Date & heure
+        let dateStr = '—';
+        if (a.ts) {
+            const d = a.ts.toDate ? a.ts.toDate() : new Date(a.ts);
+            dateStr = d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
+                    + ' · ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+        }
+
+        // Question atteinte (optionnel)
+        const qAtteinte = a.questionAtteinte ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Arrêté à la question ${a.questionAtteinte}</div>` : '';
+
+        return `<tr>
+            <td>${rankHtml}</td>
+            <td>
+                <div class="player-cell">
+                    ${flagHtml}
+                    <div>
+                        <strong>${a.name || '—'}</strong>
+                        ${a.countryName ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${a.countryName}</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>${domNom}</td>
+            <td>${niv ? `<span class="niveau-chip ${nivCls}">${nivLbl}</span>` : '—'}</td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:12px;color:var(--text-muted)">${dateStr}</span>
+                    ${qAtteinte}
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table class="score-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Joueur</th>
+                    <th>Domaine</th>
+                    <th>Niveau</th>
+                    <th>Date &amp; heure</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>`;
+
+    // Pagination
+    if (total <= 1) { pg.innerHTML = ''; return; }
+    let html = `<button class="page-btn" id="pg-abandons-prev" ${abandonsPage === 1 ? 'disabled' : ''}>‹ Préc.</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - abandonsPage) <= 2) {
+            html += `<button class="page-btn ${i === abandonsPage ? 'active' : ''}" data-abandons-page="${i}">${i}</button>`;
+        } else if (Math.abs(i - abandonsPage) === 3) {
+            html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+        }
+    }
+    html += `<button class="page-btn" id="pg-abandons-next" ${abandonsPage === total ? 'disabled' : ''}>Suiv. ›</button>`;
+    pg.innerHTML = html;
+
+    pg.querySelectorAll('[data-abandons-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            abandonsPage = parseInt(btn.dataset.abandonsPage);
+            renderAbandons();
+        });
+    });
+    pg.querySelector('#pg-abandons-prev')?.addEventListener('click', () => {
+        if (abandonsPage > 1) { abandonsPage--; renderAbandons(); }
+    });
+    pg.querySelector('#pg-abandons-next')?.addEventListener('click', () => {
+        if (abandonsPage < total) { abandonsPage++; renderAbandons(); }
     });
 }
 
