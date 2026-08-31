@@ -29,6 +29,71 @@ let allAbandons    = [];
 let abandonsPage   = 1;
 const ABANDONS_PAGE_SIZE = 20;
 
+// Données joueurs inscrits (collection "Joueurs")
+let allJoueurs = [];
+
+// Données réinitialisations PIN
+let allResetPin = [];
+
+// Données nouveau profil
+let allNouveauProfil = [];
+
+// Avatars dinosaures (même liste que le quiz)
+const AVATARS_ADMIN = [
+    { id: 'tyrannosaurus',      emoji: '🦖', wiki: 'Tyrannosaurus' },
+    { id: 'triceratops',        emoji: '🦕', wiki: 'Triceratops' },
+    { id: 'velociraptor',       emoji: '🦖', wiki: 'Velociraptor' },
+    { id: 'stegosaurus',        emoji: '🦕', wiki: 'Stegosaurus' },
+    { id: 'brachiosaurus',      emoji: '🦕', wiki: 'Brachiosaurus' },
+    { id: 'pterodactyl',        emoji: '🦅', wiki: 'Pteranodon' },
+    { id: 'spinosaurus',        emoji: '🦖', wiki: 'Spinosaurus' },
+    { id: 'ankylosaurus',       emoji: '🦕', wiki: 'Ankylosaurus' },
+    { id: 'plesiosaurus',       emoji: '🐊', wiki: 'Plesiosaurus' },
+    { id: 'diplodocus',         emoji: '🦕', wiki: 'Diplodocus' },
+    { id: 'oviraptor',          emoji: '🦖', wiki: 'Oviraptor' },
+    { id: 'allosaurus',         emoji: '🦖', wiki: 'Allosaurus' },
+    { id: 'iguanodon',          emoji: '🦎', wiki: 'Iguanodon' },
+    { id: 'parasaurolophus',    emoji: '🦕', wiki: 'Parasaurolophus' },
+    { id: 'carnotaurus',        emoji: '🦖', wiki: 'Carnotaurus' },
+    { id: 'pachycephalosaurus', emoji: '🦕', wiki: 'Pachycephalosaurus' },
+    { id: 'giganotosaurus',     emoji: '🦖', wiki: 'Giganotosaurus' },
+    { id: 'dilophosaurus',      emoji: '🦖', wiki: 'Dilophosaurus' },
+    { id: 'therizinosaurus',    emoji: '🦕', wiki: 'Therizinosaurus' },
+    { id: 'mosasaurus',         emoji: '🐊', wiki: 'Mosasaurus' },
+    { id: 'archaeopteryx',      emoji: '🦅', wiki: 'Archaeopteryx' },
+    { id: 'gallimimus',         emoji: '🦕', wiki: 'Gallimimus' },
+    { id: 'styracosaurus',      emoji: '🦕', wiki: 'Styracosaurus' },
+    { id: 'deinonychus',        emoji: '🦖', wiki: 'Deinonychus' },
+    { id: 'mosasaurus2',        emoji: '🐬', wiki: 'Ichthyosaurus' },
+];
+const avatarImgCacheAdmin = {};
+
+function getAvatarEmojiAdmin(avatarId) {
+    const av = AVATARS_ADMIN.find(a => a.id === avatarId);
+    return av ? av.emoji : '🦕';
+}
+
+function getAvatarImgAdmin(avatarId) {
+    const av = AVATARS_ADMIN.find(a => a.id === avatarId) || AVATARS_ADMIN[0];
+    if (avatarImgCacheAdmin[av.wiki]) return `<img src="${avatarImgCacheAdmin[av.wiki]}" alt="${av.emoji}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;border:2px solid var(--primary-light);">`;
+    return `<span style="font-size:22px" title="${av.id}">${av.emoji}</span>`;
+}
+
+async function prefetchAvatarImages(avatarIds) {
+    const uniqueIds = [...new Set(avatarIds.filter(Boolean))];
+    await Promise.all(uniqueIds.map(async (id) => {
+        const av = AVATARS_ADMIN.find(a => a.id === id);
+        if (!av || avatarImgCacheAdmin[av.wiki]) return;
+        try {
+            const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(av.wiki)}&prop=pageimages&format=json&pithumbsize=80&origin=*`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const page = Object.values(data.query.pages)[0];
+            if (page.thumbnail?.source) avatarImgCacheAdmin[av.wiki] = page.thumbnail.source;
+        } catch(e) { /* fallback emoji */ }
+    }));
+}
+
 const NOM_DOMAINES = {
     informatique:     "Informatique",
     droit:            "Droit",
@@ -136,12 +201,16 @@ async function loadAllData() {
         renderKPIs();
         renderFrequentation();
         renderDomains();
+        renderDomainesJoues();
         renderPays();
         renderInactifs();
         renderProfilJoueurs();
         applyFilters();
         await loadAbandons();
         await loadReponses();
+        await loadJoueurs();
+        await loadResetPin();
+        await loadNouveauProfil();
 
     } catch(e) {
         console.error(e);
@@ -564,10 +633,17 @@ function renderTable() {
 
         const domNom = NOM_DOMAINES[s.sub || s.domain] || NOM_DOMAINES[s.domain] || s.domain;
 
+        // Avatar : chercher dans allJoueurs d'abord, sinon emoji par défaut
+        const joueurData = allJoueurs.find(j => (j.name || '').toLowerCase() === (s.name || '').toLowerCase());
+        const avatarHtml = joueurData?.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(joueurData.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
         return `<tr>
             <td>${rankHtml}</td>
             <td>
                 <div class="player-cell">
+                    ${avatarHtml}
                     ${flagHtml}
                     <div>
                         <strong>${s.name}</strong>
@@ -732,10 +808,16 @@ function renderInactifsTable() {
         const absence   = joursDepuis(j.dernierePartie);
         const dateStr   = j.dernierePartie.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
+        const joueurInactifInfo = allJoueurs.find(jd => (jd.name || '').toLowerCase() === j.nom.toLowerCase());
+        const avatarInactifHtml = joueurInactifInfo?.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(joueurInactifInfo.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
         return `<tr>
             <td>${rankHtml}</td>
             <td>
                 <div class="player-cell">
+                    ${avatarInactifHtml}
                     ${flagHtml}
                     <div>
                         <strong>${j.nom}</strong>
@@ -883,6 +965,12 @@ function renderAbandons() {
         else if (rank === 3) rankHtml = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:18px">grade</span>3e</span>`;
         else                 rankHtml = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:16px">tag</span>${rank}</span>`;
 
+        // Avatar
+        const joueurAbandon = allJoueurs.find(j => (j.name || '').toLowerCase() === (a.name || '').toLowerCase());
+        const avatarAbandonHtml = joueurAbandon?.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(joueurAbandon.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
         // Drapeau
         let flagHtml = '';
         if (a.countryCode) {
@@ -909,6 +997,7 @@ function renderAbandons() {
             <td>${rankHtml}</td>
             <td>
                 <div class="player-cell">
+                    ${avatarAbandonHtml}
                     ${flagHtml}
                     <div>
                         <strong>${a.name || '—'}</strong>
@@ -1207,6 +1296,285 @@ function renderMissed() {
         </li>`;
     }).join('');
 }
+// ══════════════════════════════════════════════════════════════════
+// ── DOMAINES LES PLUS JOUÉS (avec filtres période + niveau) ──────
+// ══════════════════════════════════════════════════════════════════
+let currentDomainesPeriod = 'day';
+
+document.querySelectorAll('.domaines-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentDomainesPeriod = btn.dataset.period;
+        document.querySelectorAll('.domaines-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderDomainesJoues();
+    });
+});
+
+function renderDomainesJoues() {
+    const container = document.getElementById('domaines-joues-list');
+    if (!container) return;
+
+    const filtered = filterByPeriod(allScores, currentDomainesPeriod);
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-msg" style="padding:32px 0">
+            <span class="material-symbols-outlined" style="animation:none;font-size:32px">bar_chart_off</span>
+            Aucune partie sur cette période.
+        </div>`;
+        return;
+    }
+
+    // Compter par domaine + niveau
+    const domaineStats = {};
+    filtered.forEach(s => {
+        const dom = s.domain || 'autre';
+        const niv = s.niveau || 'aléatoire';
+        if (!domaineStats[dom]) {
+            domaineStats[dom] = { total: 0, niveaux: {}, pcts: [] };
+        }
+        domaineStats[dom].total++;
+        domaineStats[dom].niveaux[niv] = (domaineStats[dom].niveaux[niv] || 0) + 1;
+        domaineStats[dom].pcts.push(parseInt(s.pct) || 0);
+    });
+
+    const sorted = Object.entries(domaineStats).sort((a, b) => b[1].total - a[1].total);
+    const maxCount = sorted[0]?.[1].total || 1;
+
+    const niveauClasse = { 'débutant':'debutant','intermédiaire':'intermediaire','avancé':'avance','aléatoire':'aleatoire' };
+    const niveauLabel  = { 'débutant':'Déb.','intermédiaire':'Inter.','avancé':'Avancé','aléatoire':'Aléat.' };
+
+    const rows = sorted.map(([dom, stats], i) => {
+        const nom    = NOM_DOMAINES[dom] || dom;
+        const icon   = DOMAINE_ICONS[dom] || 'category';
+        const pct    = Math.round((stats.total / maxCount) * 100);
+        const avgPct = stats.pcts.length ? Math.round(stats.pcts.reduce((a,b) => a+b,0) / stats.pcts.length) : 0;
+        const scoreColor = avgPct >= 70 ? 'var(--success)' : avgPct >= 40 ? 'var(--warning)' : 'var(--error)';
+
+        // Médaille
+        let medal = '';
+        if      (i === 0) medal = `<span class="rank-medal gold"><span class="material-symbols-outlined" style="font-size:16px">military_tech</span>1er</span>`;
+        else if (i === 1) medal = `<span class="rank-medal silver"><span class="material-symbols-outlined" style="font-size:16px">workspace_premium</span>2e</span>`;
+        else if (i === 2) medal = `<span class="rank-medal bronze"><span class="material-symbols-outlined" style="font-size:16px">grade</span>3e</span>`;
+        else              medal = `<span class="rank-medal other"><span class="material-symbols-outlined" style="font-size:14px">tag</span>${i+1}</span>`;
+
+        // Niveaux chips
+        const niveauxHtml = Object.entries(stats.niveaux)
+            .sort((a,b) => b[1]-a[1])
+            .map(([niv, cnt]) => {
+                const cls = niveauClasse[niv] || '';
+                const lbl = niveauLabel[niv] || niv;
+                return `<span class="niveau-chip ${cls}" style="font-size:10px;padding:2px 7px">${lbl} <strong>${cnt}</strong></span>`;
+            }).join('');
+
+        return `<div class="domaines-joues-row">
+            <div class="dj-left">
+                ${medal}
+                <span class="material-symbols-outlined" style="color:var(--primary);font-size:20px">${icon}</span>
+                <div class="dj-info">
+                    <div class="dj-name">${nom}</div>
+                    <div class="dj-niveaux">${niveauxHtml}</div>
+                </div>
+            </div>
+            <div class="dj-right">
+                <div class="dj-bar-wrap">
+                    <div class="dj-bar-bg">
+                        <div class="dj-bar-fill" style="width:${pct}%"></div>
+                    </div>
+                    <span class="dj-count">${stats.total} partie${stats.total > 1 ? 's' : ''}</span>
+                </div>
+                <span class="dj-avg" style="color:${scoreColor}">Score moy. <strong>${avgPct}%</strong></span>
+            </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `<div class="domaines-joues-container">${rows}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ── INSCRIPTIONS DES JOUEURS ──────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let currentInscriptionsPeriod = 'day';
+
+document.querySelectorAll('.inscriptions-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentInscriptionsPeriod = btn.dataset.period;
+        document.querySelectorAll('.inscriptions-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderInscriptions();
+    });
+});
+
+async function loadJoueurs() {
+    try {
+        const snap = await getDocs(
+            query(collection(db, "Joueurs"), orderBy("ts", "desc"))
+        );
+        allJoueurs = snap.docs.map(d => d.data());
+
+        // Pré-charger les images d'avatars des joueurs
+        const avatarIds = allJoueurs.map(j => j.avatarId).filter(Boolean);
+        await prefetchAvatarImages(avatarIds);
+
+        renderInscriptions();
+        renderJoueursInscrits();
+        // Re-render les tableaux qui affichent les avatars
+        renderProfilJoueurs();
+        renderInactifs();
+    } catch(e) {
+        console.warn("Collection 'Joueurs' introuvable ou erreur :", e);
+        allJoueurs = [];
+        renderInscriptions();
+    }
+}
+
+function filterJoueursByPeriod(joueurs, period) {
+    const bounds = getDateBounds(period);
+    if (!bounds) return joueurs;
+    return joueurs.filter(j => {
+        if (!j.ts) return false;
+        const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+        return d >= bounds.start && d <= bounds.end;
+    });
+}
+
+function renderInscriptions() {
+    const countEl  = document.getElementById('inscriptions-count');
+    const totalEl  = document.getElementById('inscriptions-total');
+    const paysEl   = document.getElementById('inscriptions-pays');
+    const barsEl   = document.getElementById('inscriptions-bars');
+    const titleEl  = document.getElementById('inscriptions-chart-title');
+    const scrollEl = document.getElementById('inscriptions-bars-scroll-wrap');
+
+    if (!countEl) return;
+
+    // Si pas encore de collection Joueurs, on estime à partir des Scores
+    const source = allJoueurs.length > 0 ? allJoueurs : null;
+
+    if (!source) {
+        // Fallback : compter les noms uniques (1ère apparition dans les scores)
+        const premierePartie = {};
+        [...allScores].reverse().forEach(s => {
+            const nom = (s.name || '').toLowerCase().trim();
+            if (!nom) return;
+            const ts = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+            if (ts) premierePartie[nom] = { ts, countryCode: s.countryCode || '' };
+        });
+
+        const joueursEstimes = Object.values(premierePartie);
+        const filtered = filterJoueursByPeriod(joueursEstimes, currentInscriptionsPeriod);
+
+        countEl.textContent = filtered.length.toLocaleString('fr');
+        totalEl.textContent = joueursEstimes.length.toLocaleString('fr');
+        const pays = new Set(joueursEstimes.filter(j => j.countryCode).map(j => j.countryCode)).size;
+        paysEl.textContent = pays || '—';
+
+        renderInscriptionsChart(joueursEstimes, barsEl, titleEl, scrollEl);
+
+        return;
+    }
+
+    const filtered = filterJoueursByPeriod(source, currentInscriptionsPeriod);
+    countEl.textContent = filtered.length.toLocaleString('fr');
+    totalEl.textContent = source.length.toLocaleString('fr');
+    const pays = new Set(source.filter(j => j.countryCode).map(j => j.countryCode)).size;
+    paysEl.textContent = pays || '—';
+
+    renderInscriptionsChart(source, barsEl, titleEl, scrollEl);
+}
+
+function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
+    let buckets = [];
+    const mois = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const now   = new Date();
+
+    if (currentInscriptionsPeriod === 'day') {
+        titleEl.textContent = "Inscriptions par heure aujourd'hui";
+        for (let h = 0; h < 24; h++) {
+            const count = joueurs.filter(j => {
+                if (!j.ts) return false;
+                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                return d.toDateString() === now.toDateString() && d.getHours() === h;
+            }).length;
+            buckets.push({ label: h + 'h', count, isFuture: h > now.getHours() });
+        }
+    } else if (currentInscriptionsPeriod === 'week') {
+        titleEl.textContent = 'Inscriptions des 7 derniers jours';
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now); d.setDate(d.getDate() - i);
+            const count = joueurs.filter(j => {
+                if (!j.ts) return false;
+                const jd = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                return jd.toDateString() === d.toDateString();
+            }).length;
+            buckets.push({ label: jours[(d.getDay() + 6) % 7], count });
+        }
+    } else if (currentInscriptionsPeriod === 'month') {
+        titleEl.textContent = 'Inscriptions par semaine ce mois';
+        const year = now.getFullYear(), month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let w = 1; w <= 5; w++) {
+            const from = (w-1)*7+1, to = Math.min(w*7, daysInMonth);
+            if (from > daysInMonth) break;
+            const count = joueurs.filter(j => {
+                if (!j.ts) return false;
+                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                return d.getFullYear() === year && d.getMonth() === month && d.getDate() >= from && d.getDate() <= to;
+            }).length;
+            buckets.push({ label: 'S'+w, count });
+        }
+    } else if (currentInscriptionsPeriod === 'year') {
+        titleEl.textContent = "Inscriptions par mois cette année";
+        const year = now.getFullYear();
+        for (let m = 0; m <= now.getMonth(); m++) {
+            const count = joueurs.filter(j => {
+                if (!j.ts) return false;
+                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                return d.getFullYear() === year && d.getMonth() === m;
+            }).length;
+            buckets.push({ label: mois[m], count });
+        }
+    } else {
+        titleEl.textContent = 'Inscriptions par année (total)';
+        const years = {};
+        joueurs.forEach(j => {
+            if (!j.ts) return;
+            const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+            const y = d.getFullYear();
+            years[y] = (years[y] || 0) + 1;
+        });
+        Object.keys(years).sort().forEach(y => buckets.push({ label: y, count: years[y] }));
+    }
+
+    if (buckets.length === 0) {
+        barsEl.innerHTML = `<div class="empty-msg" style="padding:20px 0;width:100%">
+            <span class="material-symbols-outlined" style="animation:none;font-size:28px">bar_chart_off</span>
+            Aucune inscription sur cette période.
+        </div>`;
+        return;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const is24h = currentInscriptionsPeriod === 'day';
+    if (scrollEl) {
+        scrollEl.style.overflowX = is24h ? 'auto' : 'visible';
+        barsEl.style.minWidth    = is24h ? (buckets.length * 36) + 'px' : '';
+    }
+
+    barsEl.innerHTML = buckets.map(b => {
+        const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
+        const isFuture = b.isFuture || false;
+        const barStyle = isFuture
+            ? `height:${pct}%;opacity:0.18;background:var(--border-color)`
+            : `height:${pct}%;background:var(--success)`;
+        return `<div class="freq-bar-col${isFuture ? ' freq-bar-future' : ''}">
+            <div class="freq-bar-count">${b.count > 0 && !isFuture ? b.count : ''}</div>
+            <div class="freq-bar" style="${barStyle}" title="${b.label} : ${isFuture ? 'à venir' : b.count + ' inscription(s)'}"></div>
+            <div class="freq-bar-label">${b.label}</div>
+        </div>`;
+    }).join('');
+}
+
 // ── PROFIL DES JOUEURS (domaine & niveau favoris) ─────────────────
 let profilPage = 1;
 const PROFIL_PAGE_SIZE = 15;
@@ -1376,10 +1744,17 @@ function renderProfilTable() {
         const sm = j.scoreMoyen;
         const smCls = sm >= 70 ? 'high' : sm >= 40 ? 'mid' : 'low';
 
+        // Avatar depuis collection Joueurs
+        const joueurInfo = allJoueurs.find(jd => (jd.name || '').toLowerCase() === j.nom.toLowerCase());
+        const avatarProfilHtml = joueurInfo?.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(joueurInfo.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
         return `<tr class="profil-row">
             <td>${rankHtml}</td>
             <td>
                 <div class="player-cell">
+                    ${avatarProfilHtml}
                     ${flagHtml}
                     <div>
                         <strong>${j.nom}</strong>
@@ -1454,4 +1829,416 @@ function renderProfilPagination() {
     pg.querySelector('#pg-profil-next')?.addEventListener('click', () => {
         if (profilPage < total) { profilPage++; renderProfilTable(); renderProfilPagination(); }
     });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ── JOUEURS INSCRITS (avec PIN masqué) ───────────────────────────
+// ══════════════════════════════════════════════════════════════════
+
+let joueursInscritsData = [];   // copie filtrée pour la recherche
+
+function renderJoueursInscrits() {
+    const tbody      = document.getElementById('joueurs-inscrits-body');
+    const countLabel = document.getElementById('joueurs-count-label');
+    if (!tbody) return;
+
+    // Trier : plus récent d'abord
+    const sorted = [...allJoueurs].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    joueursInscritsData = sorted;
+
+    countLabel.textContent = `${sorted.length} joueur${sorted.length > 1 ? 's' : ''}`;
+    renderJoueursInscritsTable(sorted);
+}
+
+function renderJoueursInscritsTable(joueurs) {
+    const tbody = document.getElementById('joueurs-inscrits-body');
+    if (!tbody) return;
+
+    if (joueurs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">
+            <span class="material-symbols-outlined" style="font-size:32px;display:block;margin-bottom:8px">person_off</span>
+            Aucun joueur trouvé.
+        </td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = joueurs.map((j, i) => {
+        // Avatar
+        const avatarHtml = j.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(j.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
+        // Drapeau
+        const flagHtml = j.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${j.countryCode.toLowerCase()}.png"
+                    alt="${j.countryName || j.countryCode}" title="${j.countryName || j.countryCode}">`
+            : '';
+
+        // PIN masqué avec bouton œil
+        const pinId  = `pin-${i}`;
+        const pinVal = j.pin || '????';
+        const pinHtml = `
+            <div class="pin-cell">
+                <span id="${pinId}" class="pin-value">••••</span>
+                <button class="pin-toggle-btn" onclick="togglePin('${pinId}','${pinVal}')"
+                    title="Afficher / Masquer le PIN">
+                    <span class="material-symbols-outlined" id="${pinId}-eye">visibility</span>
+                </button>
+            </div>`;
+
+        // Dates
+        const tsInscription = j.ts
+            ? new Date(j.ts).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
+              + ' · ' + new Date(j.ts).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
+            : '—';
+
+        const tsUpdate = j.tsUpdate && j.tsUpdate !== j.ts
+            ? new Date(j.tsUpdate).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
+              + ' · ' + new Date(j.tsUpdate).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
+            : '—';
+
+        return `<tr>
+            <td>${i + 1}</td>
+            <td>
+                <div class="player-cell">
+                    ${avatarHtml}
+                    ${flagHtml}
+                    <div>
+                        <strong>${j.name || '—'}</strong>
+                        ${j.countryName ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${j.countryName}</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>${pinHtml}</td>
+            <td class="date-cell">${tsInscription}</td>
+            <td class="date-cell">${tsUpdate}</td>
+        </tr>`;
+    }).join('');
+}
+
+// Toggle PIN masqué/visible
+window.togglePin = function(pinId, pinVal) {
+    const span = document.getElementById(pinId);
+    const eye  = document.getElementById(pinId + '-eye');
+    if (!span) return;
+    if (span.textContent === '••••') {
+        span.textContent   = pinVal;
+        eye.textContent    = 'visibility_off';
+    } else {
+        span.textContent   = '••••';
+        eye.textContent    = 'visibility';
+    }
+};
+
+// Recherche dans le tableau joueurs inscrits
+document.getElementById('joueurs-search')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    const filtered = q
+        ? allJoueurs.filter(j =>
+            (j.name        || '').toLowerCase().includes(q) ||
+            (j.countryName || '').toLowerCase().includes(q) ||
+            (j.countryCode || '').toLowerCase().includes(q)
+          )
+        : allJoueurs;
+    document.getElementById('joueurs-count-label').textContent =
+        `${filtered.length} joueur${filtered.length > 1 ? 's' : ''}`;
+    renderJoueursInscritsTable(filtered);
+});
+
+// ══════════════════════════════════════════════════════════════════
+// ── RÉINITIALISATIONS DE PIN ──────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let currentResetPinPeriod = 'day';
+
+document.querySelectorAll('.resetpin-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentResetPinPeriod = btn.dataset.period;
+        document.querySelectorAll('.resetpin-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderResetPin();
+    });
+});
+
+async function loadResetPin() {
+    try {
+        const snap = await getDocs(
+            query(collection(db, 'ResetPin'), orderBy('ts', 'desc'))
+        );
+        allResetPin = snap.docs.map(d => d.data());
+        renderResetPin();
+    } catch(e) {
+        console.warn("Collection 'ResetPin' introuvable ou erreur :", e);
+        allResetPin = [];
+        renderResetPin();
+    }
+}
+
+function filterEventsByPeriod(events, period) {
+    const bounds = getDateBounds(period);
+    if (!bounds) return events;
+    return events.filter(ev => {
+        if (!ev.ts) return false;
+        // ts est en millisecondes (number) dans ces collections
+        const d = typeof ev.ts === 'number' ? new Date(ev.ts)
+                : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+        return d >= bounds.start && d <= bounds.end;
+    });
+}
+
+function renderResetPin() {
+    const countEl  = document.getElementById('resetpin-count');
+    const paysEl   = document.getElementById('resetpin-pays');
+    const totalEl  = document.getElementById('resetpin-total');
+    const barsEl   = document.getElementById('resetpin-bars');
+    const titleEl  = document.getElementById('resetpin-chart-title');
+    const scrollEl = document.getElementById('resetpin-bars-scroll-wrap');
+    if (!countEl) return;
+
+    const filtered = filterEventsByPeriod(allResetPin, currentResetPinPeriod);
+
+    countEl.textContent = filtered.length.toLocaleString('fr');
+    totalEl.textContent = allResetPin.length.toLocaleString('fr');
+    const pays = new Set(filtered.filter(ev => ev.countryCode).map(ev => ev.countryCode)).size;
+    paysEl.textContent = pays || '—';
+
+    renderEventsChart(allResetPin, currentResetPinPeriod, barsEl, titleEl, scrollEl, 'resetpin');
+}
+
+function renderEventsChart(events, period, barsEl, titleEl, scrollEl, colorKey) {
+    const mois = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const now   = new Date();
+    let buckets = [];
+
+    // Normaliser le timestamp (ms number ou Firestore Timestamp)
+    function getDate(ev) {
+        if (!ev.ts) return null;
+        return typeof ev.ts === 'number' ? new Date(ev.ts)
+             : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+    }
+
+    if (period === 'day') {
+        titleEl.textContent = "Réinitialisations par heure aujourd'hui";
+        for (let h = 0; h < 24; h++) {
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.toDateString() === now.toDateString() && d.getHours() === h;
+            }).length;
+            buckets.push({ label: h + 'h', count, isFuture: h > now.getHours() });
+        }
+    } else if (period === 'week') {
+        titleEl.textContent = 'Réinitialisations des 7 derniers jours';
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now); d.setDate(d.getDate() - i);
+            const count = events.filter(ev => {
+                const ed = getDate(ev); if (!ed) return false;
+                return ed.toDateString() === d.toDateString();
+            }).length;
+            buckets.push({ label: jours[(d.getDay() + 6) % 7], count });
+        }
+    } else if (period === 'month') {
+        titleEl.textContent = 'Réinitialisations par semaine ce mois';
+        const year = now.getFullYear(), month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let w = 1; w <= 5; w++) {
+            const from = (w-1)*7+1, to = Math.min(w*7, daysInMonth);
+            if (from > daysInMonth) break;
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === month && d.getDate() >= from && d.getDate() <= to;
+            }).length;
+            buckets.push({ label: 'S'+w, count });
+        }
+    } else if (period === 'year') {
+        titleEl.textContent = 'Réinitialisations par mois cette année';
+        const year = now.getFullYear();
+        for (let m = 0; m <= now.getMonth(); m++) {
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === m;
+            }).length;
+            buckets.push({ label: mois[m], count });
+        }
+    } else {
+        titleEl.textContent = 'Réinitialisations par année (total)';
+        const years = {};
+        events.forEach(ev => {
+            const d = getDate(ev); if (!d) return;
+            const y = d.getFullYear();
+            years[y] = (years[y] || 0) + 1;
+        });
+        Object.keys(years).sort().forEach(y => buckets.push({ label: y, count: years[y] }));
+    }
+
+    if (buckets.length === 0) {
+        barsEl.innerHTML = `<div class="empty-msg" style="padding:20px 0;width:100%">
+            <span class="material-symbols-outlined" style="animation:none;font-size:28px">bar_chart_off</span>
+            Aucune donnée pour cette période.
+        </div>`;
+        return;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const is24h    = period === 'day';
+    if (scrollEl) {
+        scrollEl.style.overflowX = is24h ? 'auto' : 'visible';
+        barsEl.style.minWidth    = is24h ? (buckets.length * 36) + 'px' : '';
+    }
+
+    // Couleur de la barre selon le type
+    const barColor = colorKey === 'resetpin' ? 'var(--warning)' : 'var(--primary)';
+
+    barsEl.innerHTML = buckets.map(b => {
+        const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
+        const isFuture = b.isFuture || false;
+        const barStyle = isFuture
+            ? `height:${pct}%;opacity:0.18;background:var(--border-color)`
+            : `height:${pct}%;background:${barColor}`;
+        return `<div class="freq-bar-col${isFuture ? ' freq-bar-future' : ''}">
+            <div class="freq-bar-count">${b.count > 0 && !isFuture ? b.count : ''}</div>
+            <div class="freq-bar" style="${barStyle}" title="${b.label} : ${isFuture ? 'à venir' : b.count}"></div>
+            <div class="freq-bar-label">${b.label}</div>
+        </div>`;
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ── JOUEURS AYANT CRÉÉ UN NOUVEAU PROFIL ─────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let currentNouveauProfilPeriod = 'day';
+
+document.querySelectorAll('.nouveauprofil-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentNouveauProfilPeriod = btn.dataset.period;
+        document.querySelectorAll('.nouveauprofil-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderNouveauProfil();
+    });
+});
+
+async function loadNouveauProfil() {
+    try {
+        const snap = await getDocs(
+            query(collection(db, 'NouveauProfil'), orderBy('ts', 'desc'))
+        );
+        allNouveauProfil = snap.docs.map(d => d.data());
+        renderNouveauProfil();
+    } catch(e) {
+        console.warn("Collection 'NouveauProfil' introuvable ou erreur :", e);
+        allNouveauProfil = [];
+        renderNouveauProfil();
+    }
+}
+
+function renderNouveauProfil() {
+    const countEl  = document.getElementById('nouveauprofil-count');
+    const paysEl   = document.getElementById('nouveauprofil-pays');
+    const totalEl  = document.getElementById('nouveauprofil-total');
+    const barsEl   = document.getElementById('nouveauprofil-bars');
+    const titleEl  = document.getElementById('nouveauprofil-chart-title');
+    const scrollEl = document.getElementById('nouveauprofil-bars-scroll-wrap');
+    if (!countEl) return;
+
+    const filtered = filterEventsByPeriod(allNouveauProfil, currentNouveauProfilPeriod);
+
+    countEl.textContent = filtered.length.toLocaleString('fr');
+    totalEl.textContent = allNouveauProfil.length.toLocaleString('fr');
+    const pays = new Set(filtered.filter(ev => ev.countryCode).map(ev => ev.countryCode)).size;
+    paysEl.textContent = pays || '—';
+
+    renderNouveauProfilChart(allNouveauProfil, currentNouveauProfilPeriod, barsEl, titleEl, scrollEl);
+}
+
+function renderNouveauProfilChart(events, period, barsEl, titleEl, scrollEl) {
+    const mois  = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const now   = new Date();
+    let buckets = [];
+
+    function getDate(ev) {
+        if (!ev.ts) return null;
+        return typeof ev.ts === 'number' ? new Date(ev.ts)
+             : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+    }
+
+    if (period === 'day') {
+        titleEl.textContent = "Nouveaux profils par heure aujourd'hui";
+        for (let h = 0; h < 24; h++) {
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.toDateString() === now.toDateString() && d.getHours() === h;
+            }).length;
+            buckets.push({ label: h + 'h', count, isFuture: h > now.getHours() });
+        }
+    } else if (period === 'week') {
+        titleEl.textContent = 'Nouveaux profils des 7 derniers jours';
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now); d.setDate(d.getDate() - i);
+            const count = events.filter(ev => {
+                const ed = getDate(ev); if (!ed) return false;
+                return ed.toDateString() === d.toDateString();
+            }).length;
+            buckets.push({ label: jours[(d.getDay() + 6) % 7], count });
+        }
+    } else if (period === 'month') {
+        titleEl.textContent = 'Nouveaux profils par semaine ce mois';
+        const year = now.getFullYear(), month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let w = 1; w <= 5; w++) {
+            const from = (w-1)*7+1, to = Math.min(w*7, daysInMonth);
+            if (from > daysInMonth) break;
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === month && d.getDate() >= from && d.getDate() <= to;
+            }).length;
+            buckets.push({ label: 'S'+w, count });
+        }
+    } else if (period === 'year') {
+        titleEl.textContent = 'Nouveaux profils par mois cette année';
+        const year = now.getFullYear();
+        for (let m = 0; m <= now.getMonth(); m++) {
+            const count = events.filter(ev => {
+                const d = getDate(ev); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === m;
+            }).length;
+            buckets.push({ label: mois[m], count });
+        }
+    } else {
+        titleEl.textContent = 'Nouveaux profils par année (total)';
+        const years = {};
+        events.forEach(ev => {
+            const d = getDate(ev); if (!d) return;
+            const y = d.getFullYear();
+            years[y] = (years[y] || 0) + 1;
+        });
+        Object.keys(years).sort().forEach(y => buckets.push({ label: y, count: years[y] }));
+    }
+
+    if (buckets.length === 0) {
+        barsEl.innerHTML = `<div class="empty-msg" style="padding:20px 0;width:100%">
+            <span class="material-symbols-outlined" style="animation:none;font-size:28px">bar_chart_off</span>
+            Aucune donnée pour cette période.
+        </div>`;
+        return;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const is24h    = period === 'day';
+    if (scrollEl) {
+        scrollEl.style.overflowX = is24h ? 'auto' : 'visible';
+        barsEl.style.minWidth    = is24h ? (buckets.length * 36) + 'px' : '';
+    }
+
+    barsEl.innerHTML = buckets.map(b => {
+        const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
+        const isFuture = b.isFuture || false;
+        const barStyle = isFuture
+            ? `height:${pct}%;opacity:0.18;background:var(--border-color)`
+            : `height:${pct}%;background:var(--primary)`;
+        return `<div class="freq-bar-col${isFuture ? ' freq-bar-future' : ''}">
+            <div class="freq-bar-count">${b.count > 0 && !isFuture ? b.count : ''}</div>
+            <div class="freq-bar" style="${barStyle}" title="${b.label} : ${isFuture ? 'à venir' : b.count}"></div>
+            <div class="freq-bar-label">${b.label}</div>
+        </div>`;
+    }).join('');
 }

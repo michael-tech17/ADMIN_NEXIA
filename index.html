@@ -144,6 +144,209 @@
             </div>
         </div>
 
+        <!-- ══ CLASSEMENT DES DOMAINES LES PLUS JOUÉS ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">bar_chart</span>
+            Domaines les plus joués
+        </div>
+        <div class="frequentation-section" id="domaines-joues-section">
+            <div class="freq-tabs">
+                <button class="domaines-tab active" data-period="day">Aujourd'hui</button>
+                <button class="domaines-tab" data-period="week">Cette semaine</button>
+                <button class="domaines-tab" data-period="month">Ce mois</button>
+                <button class="domaines-tab" data-period="year">Cette année</button>
+                <button class="domaines-tab" data-period="all">Total</button>
+            </div>
+            <div id="domaines-joues-list">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+        </div>
+
+        <!-- ══ INSCRIPTIONS DES JOUEURS ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">person_add</span>
+            Inscriptions des joueurs
+        </div>
+        <div class="frequentation-section" id="inscriptions-section">
+            <div class="freq-tabs">
+                <button class="inscriptions-tab active" data-period="day">Aujourd'hui</button>
+                <button class="inscriptions-tab" data-period="week">Cette semaine</button>
+                <button class="inscriptions-tab" data-period="month">Ce mois</button>
+                <button class="inscriptions-tab" data-period="year">Cette année</button>
+                <button class="inscriptions-tab" data-period="all">Total</button>
+            </div>
+            <div class="freq-cards" id="inscriptions-kpis">
+                <div class="freq-card">
+                    <div class="freq-icon players"><span class="material-symbols-outlined">person_add</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Nouvelles inscriptions</div>
+                        <div class="freq-value" id="inscriptions-count">—</div>
+                        <div class="freq-sub">sur la période sélectionnée</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon visitors"><span class="material-symbols-outlined">group</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Total inscrit(e)s</div>
+                        <div class="freq-value" id="inscriptions-total">—</div>
+                        <div class="freq-sub">depuis le lancement</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon avg"><span class="material-symbols-outlined">public</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Pays représentés</div>
+                        <div class="freq-value" id="inscriptions-pays">—</div>
+                        <div class="freq-sub">parmi les inscrits</div>
+                    </div>
+                </div>
+            </div>
+            <div class="freq-chart-wrap">
+                <div class="freq-chart-title" id="inscriptions-chart-title">Inscriptions des 7 derniers jours</div>
+                <div class="freq-bars-scroll-wrap" id="inscriptions-bars-scroll-wrap">
+                    <div class="freq-bars" id="inscriptions-bars">
+                        <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ RÉINITIALISATIONS DE PIN ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">key</span>
+            Réinitialisations de PIN réussies
+        </div>
+        <div class="frequentation-section" id="resetpin-section">
+            <div class="freq-tabs">
+                <button class="resetpin-tab active" data-period="day">Aujourd'hui</button>
+                <button class="resetpin-tab" data-period="week">Cette semaine</button>
+                <button class="resetpin-tab" data-period="month">Ce mois</button>
+                <button class="resetpin-tab" data-period="year">Cette année</button>
+                <button class="resetpin-tab" data-period="all">Total</button>
+            </div>
+            <div class="freq-cards" id="resetpin-kpis">
+                <div class="freq-card">
+                    <div class="freq-icon resetpin-icon">🔑</div>
+                    <div class="freq-info">
+                        <div class="freq-label">Réinitialisations réussies</div>
+                        <div class="freq-value" id="resetpin-count">—</div>
+                        <div class="freq-sub">sur la période sélectionnée</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon visitors"><span class="material-symbols-outlined">public</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Pays concernés</div>
+                        <div class="freq-value" id="resetpin-pays">—</div>
+                        <div class="freq-sub">pays différents</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon avg"><span class="material-symbols-outlined">key</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Total réinitialisations</div>
+                        <div class="freq-value" id="resetpin-total">—</div>
+                        <div class="freq-sub">depuis le lancement</div>
+                    </div>
+                </div>
+            </div>
+            <div class="freq-chart-wrap">
+                <div class="freq-chart-title" id="resetpin-chart-title">Réinitialisations du jour par heure</div>
+                <div class="freq-bars-scroll-wrap" id="resetpin-bars-scroll-wrap">
+                    <div class="freq-bars" id="resetpin-bars">
+                        <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ NOUVEAU PROFIL ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">person_add</span>
+            Joueurs ayant préféré créer un nouveau profil
+        </div>
+        <div class="frequentation-section" id="nouveauprofil-section">
+            <div class="freq-tabs">
+                <button class="nouveauprofil-tab active" data-period="day">Aujourd'hui</button>
+                <button class="nouveauprofil-tab" data-period="week">Cette semaine</button>
+                <button class="nouveauprofil-tab" data-period="month">Ce mois</button>
+                <button class="nouveauprofil-tab" data-period="year">Cette année</button>
+                <button class="nouveauprofil-tab" data-period="all">Total</button>
+            </div>
+            <div class="freq-cards" id="nouveauprofil-kpis">
+                <div class="freq-card">
+                    <div class="freq-icon nouveauprofil-icon">➕</div>
+                    <div class="freq-info">
+                        <div class="freq-label">Nouveaux profils créés</div>
+                        <div class="freq-value" id="nouveauprofil-count">—</div>
+                        <div class="freq-sub">sur la période sélectionnée</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon visitors"><span class="material-symbols-outlined">public</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Pays concernés</div>
+                        <div class="freq-value" id="nouveauprofil-pays">—</div>
+                        <div class="freq-sub">pays différents</div>
+                    </div>
+                </div>
+                <div class="freq-card">
+                    <div class="freq-icon avg"><span class="material-symbols-outlined">person_add</span></div>
+                    <div class="freq-info">
+                        <div class="freq-label">Total nouveaux profils</div>
+                        <div class="freq-value" id="nouveauprofil-total">—</div>
+                        <div class="freq-sub">depuis le lancement</div>
+                    </div>
+                </div>
+            </div>
+            <div class="freq-chart-wrap">
+                <div class="freq-chart-title" id="nouveauprofil-chart-title">Nouveaux profils du jour par heure</div>
+                <div class="freq-bars-scroll-wrap" id="nouveauprofil-bars-scroll-wrap">
+                    <div class="freq-bars" id="nouveauprofil-bars">
+                        <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ LISTE DES JOUEURS INSCRITS ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">manage_accounts</span>
+            Joueurs inscrits
+        </div>
+        <div class="leaderboard-section" id="joueurs-inscrits-section">
+            <div class="leaderboard-header">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <div style="position:relative;display:inline-flex;align-items:center;">
+                        <span class="material-symbols-outlined" style="position:absolute;left:10px;font-size:18px;color:var(--text-muted);pointer-events:none;">search</span>
+                        <input type="text" id="joueurs-search" placeholder="Rechercher un joueur…"
+                            style="padding:8px 14px 8px 34px;border-radius:8px;border:1px solid var(--border-color);
+                                   background:var(--bg-element);color:var(--text-main);font-size:13px;
+                                   font-family:inherit;outline:none;min-width:200px;">
+                    </div>
+                    <span id="joueurs-count-label" style="font-size:13px;color:var(--text-muted)">— joueurs</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="leaderboard-table" id="joueurs-inscrits-table">
+                    <thead>
+                        <tr>
+                            <th style="width:48px">#</th>
+                            <th>Joueur</th>
+                            <th>Code PIN</th>
+                            <th>Inscription</th>
+                            <th>Dernière connexion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="joueurs-inscrits-body">
+                        <tr><td colspan="5" style="text-align:center;padding:32px">
+                            <span class="material-symbols-outlined" style="font-size:28px;color:var(--text-muted)">autorenew</span>
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Stats par domaine -->
         <div class="section-title">
             <span class="material-symbols-outlined">bar_chart</span>
