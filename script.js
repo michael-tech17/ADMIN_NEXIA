@@ -15,6 +15,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
+// ── UTILITAIRE : convertit n'importe quel timestamp Firestore en Date JS ──
+// Gère : Firestore Timestamp (.toDate()), number (ms), string ISO
+function toDate(ts) {
+    if (!ts) return null;
+    if (ts.toDate) return ts.toDate();       // Firestore Timestamp natif
+    if (typeof ts === 'number') return new Date(ts); // millisecondes
+    return new Date(ts);                     // string ISO ou autre
+}
+
+function formatDateTime(ts) {
+    const d = toDate(ts);
+    if (!d || isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+        + ' · '
+        + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateOnly(ts) {
+    const d = toDate(ts);
+    if (!d || isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 // ── MOT DE PASSE ADMIN ───────────────────────────────────────────
 // Le mot de passe est stocké dans Firestore : collection "config" > document "admin" > champ "password"
 // Il n'est jamais visible dans le code source.
@@ -189,6 +212,7 @@ async function loadAllData() {
     document.getElementById('btn-refresh').querySelector('.material-symbols-outlined').style.animation = 'spin 1s linear infinite';
 
     try {
+        // ── 1. Charger les scores ────────────────────────────────────
         const snap = await getDocs(
             query(collection(db, "Score"), orderBy("ts", "desc"))
         );
@@ -198,6 +222,12 @@ async function loadAllData() {
         document.getElementById('last-update').textContent =
             'Mis à jour à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+        // ── 2. Charger les joueurs ET leurs avatars EN PREMIER ───────
+        // Indispensable : tous les tableaux (classement, abandons, inactifs, profil)
+        // utilisent les avatars → il faut que le cache soit prêt avant le premier rendu.
+        await loadJoueurs();
+
+        // ── 3. Maintenant on peut tout rendre (cache avatars prêt) ───
         renderKPIs();
         renderFrequentation();
         renderDomains();
@@ -206,11 +236,14 @@ async function loadAllData() {
         renderInactifs();
         renderProfilJoueurs();
         applyFilters();
-        await loadAbandons();
-        await loadReponses();
-        await loadJoueurs();
-        await loadResetPin();
-        await loadNouveauProfil();
+
+        // ── 4. Charger les autres collections en parallèle ───────────
+        await Promise.all([
+            loadAbandons(),
+            loadReponses(),
+            loadResetPin(),
+            loadNouveauProfil(),
+        ]);
 
     } catch(e) {
         console.error(e);
@@ -258,8 +291,8 @@ function filterByPeriod(scores, period) {
     const bounds = getDateBounds(period);
     if (!bounds) return scores;
     return scores.filter(s => {
-        if (!s.ts) return false;
-        const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+        const d = toDate(s.ts);
+        if (!d) return false;
         return d >= bounds.start && d <= bounds.end;
     });
 }
@@ -299,7 +332,7 @@ function renderFreqChart() {
             const label = h + 'h';
             const count = allScores.filter(s => {
                 if (!s.ts) return false;
-                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                const d = toDate(s.ts);
                 return d.toDateString() === now.toDateString() && d.getHours() === h;
             }).length;
             buckets.push({ label, count, isFuture: h > now.getHours() });
@@ -314,7 +347,7 @@ function renderFreqChart() {
             const label = jours[(d.getDay() + 6) % 7];
             const count = allScores.filter(s => {
                 if (!s.ts) return false;
-                const sd = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                const sd = toDate(s.ts);
                 return sd.toDateString() === d.toDateString();
             }).length;
             buckets.push({ label, count });
@@ -332,7 +365,7 @@ function renderFreqChart() {
             const label = 'S' + w;
             const count = allScores.filter(s => {
                 if (!s.ts) return false;
-                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                const d = toDate(s.ts);
                 return d.getFullYear() === year && d.getMonth() === month
                     && d.getDate() >= from && d.getDate() <= to;
             }).length;
@@ -347,7 +380,7 @@ function renderFreqChart() {
             const label = mois[m];
             const count = allScores.filter(s => {
                 if (!s.ts) return false;
-                const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+                const d = toDate(s.ts);
                 return d.getFullYear() === year && d.getMonth() === m;
             }).length;
             buckets.push({ label, count });
@@ -358,7 +391,7 @@ function renderFreqChart() {
         const years = {};
         allScores.forEach(s => {
             if (!s.ts) return;
-            const d = s.ts.toDate ? s.ts.toDate() : new Date(s.ts);
+            const d = toDate(s.ts);
             const y = d.getFullYear();
             years[y] = (years[y] || 0) + 1;
         });
@@ -572,7 +605,7 @@ function applyFilters() {
         if (domain && s.domain !== domain) return false;
         if (niveau && s.niveau !== niveau) return false;
         if (periode !== 'all' && s.ts) {
-            const tsMs = s.ts.toDate ? s.ts.toDate().getTime() : new Date(s.ts).getTime();
+            const tsMs = toDate(s.ts).getTime();
             if (periode === 'today' && (now - tsMs) > day)       return false;
             if (periode === 'week'  && (now - tsMs) > 7 * day)   return false;
             if (periode === 'month' && (now - tsMs) > 30 * day)  return false;
@@ -581,8 +614,8 @@ function applyFilters() {
     }).sort((a, b) => {
         const pctDiff = (parseInt(b.pct) || 0) - (parseInt(a.pct) || 0);
         if (pctDiff !== 0) return pctDiff;
-        const aTs = a.ts ? (a.ts.toDate ? a.ts.toDate().getTime() : new Date(a.ts).getTime()) : 0;
-        const bTs = b.ts ? (b.ts.toDate ? b.ts.toDate().getTime() : new Date(b.ts).getTime()) : 0;
+        const aTs = toDate(a.ts)?.getTime() ?? 0;
+        const bTs = toDate(b.ts)?.getTime() ?? 0;
         return aTs - bTs;
     });
 
@@ -731,7 +764,7 @@ function renderInactifs() {
         const nom = (s.name || '').trim();
         if (!nom) return;
         const nomKey = nom.toLowerCase();
-        const ts = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+        const ts = s.ts ? (toDate(s.ts)) : null;
         if (!ts) return;
 
         if (!parJoueur[nomKey]) {
@@ -930,7 +963,7 @@ function renderAbandons() {
         if (domFil && (a.domain || '') !== domFil) return false;
         if (nivFil && (a.niveau || '') !== nivFil) return false;
         if (periodeV !== 'all' && a.ts) {
-            const tsMs = a.ts.toDate ? a.ts.toDate().getTime() : new Date(a.ts).getTime();
+            const tsMs = toDate(a.ts).getTime();
             if (periodeV === 'today' && (now - tsMs) > day)      return false;
             if (periodeV === 'week'  && (now - tsMs) > 7 * day)  return false;
             if (periodeV === 'month' && (now - tsMs) > 30 * day) return false;
@@ -985,7 +1018,7 @@ function renderAbandons() {
         // Date & heure
         let dateStr = '—';
         if (a.ts) {
-            const d = a.ts.toDate ? a.ts.toDate() : new Date(a.ts);
+            const d = toDate(a.ts);
             dateStr = d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
                     + ' · ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
         }
@@ -1417,9 +1450,11 @@ async function loadJoueurs() {
 
         renderInscriptions();
         renderJoueursInscrits();
-        // Re-render les tableaux qui affichent les avatars
+        // Re-render TOUS les tableaux qui affichent des avatars, maintenant que le cache est prêt
         renderProfilJoueurs();
         renderInactifs();
+        renderAbandons();   // ← manquait : les abandons avaient toujours l'émoji
+        applyFilters();     // ← re-render le classement global avec les vraies images
     } catch(e) {
         console.warn("Collection 'Joueurs' introuvable ou erreur :", e);
         allJoueurs = [];
@@ -1431,8 +1466,8 @@ function filterJoueursByPeriod(joueurs, period) {
     const bounds = getDateBounds(period);
     if (!bounds) return joueurs;
     return joueurs.filter(j => {
-        if (!j.ts) return false;
-        const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+        const d = toDate(j.ts);
+        if (!d) return false;
         return d >= bounds.start && d <= bounds.end;
     });
 }
@@ -1456,7 +1491,7 @@ function renderInscriptions() {
         [...allScores].reverse().forEach(s => {
             const nom = (s.name || '').toLowerCase().trim();
             if (!nom) return;
-            const ts = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+            const ts = s.ts ? (toDate(s.ts)) : null;
             if (ts) premierePartie[nom] = { ts, countryCode: s.countryCode || '' };
         });
 
@@ -1493,7 +1528,7 @@ function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
         for (let h = 0; h < 24; h++) {
             const count = joueurs.filter(j => {
                 if (!j.ts) return false;
-                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                const d = toDate(j.ts);
                 return d.toDateString() === now.toDateString() && d.getHours() === h;
             }).length;
             buckets.push({ label: h + 'h', count, isFuture: h > now.getHours() });
@@ -1504,7 +1539,7 @@ function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
             const d = new Date(now); d.setDate(d.getDate() - i);
             const count = joueurs.filter(j => {
                 if (!j.ts) return false;
-                const jd = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                const jd = toDate(j.ts);
                 return jd.toDateString() === d.toDateString();
             }).length;
             buckets.push({ label: jours[(d.getDay() + 6) % 7], count });
@@ -1518,7 +1553,7 @@ function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
             if (from > daysInMonth) break;
             const count = joueurs.filter(j => {
                 if (!j.ts) return false;
-                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                const d = toDate(j.ts);
                 return d.getFullYear() === year && d.getMonth() === month && d.getDate() >= from && d.getDate() <= to;
             }).length;
             buckets.push({ label: 'S'+w, count });
@@ -1529,7 +1564,7 @@ function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
         for (let m = 0; m <= now.getMonth(); m++) {
             const count = joueurs.filter(j => {
                 if (!j.ts) return false;
-                const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+                const d = toDate(j.ts);
                 return d.getFullYear() === year && d.getMonth() === m;
             }).length;
             buckets.push({ label: mois[m], count });
@@ -1539,7 +1574,7 @@ function renderInscriptionsChart(joueurs, barsEl, titleEl, scrollEl) {
         const years = {};
         joueurs.forEach(j => {
             if (!j.ts) return;
-            const d = j.ts.toDate ? j.ts.toDate() : new Date(j.ts);
+            const d = toDate(j.ts);
             const y = d.getFullYear();
             years[y] = (years[y] || 0) + 1;
         });
@@ -1604,7 +1639,7 @@ function renderProfilJoueurs() {
         const nom = (s.name || '').trim();
         if (!nom) return;
         const key = nom.toLowerCase();
-        const ts  = s.ts ? (s.ts.toDate ? s.ts.toDate() : new Date(s.ts)) : null;
+        const ts  = s.ts ? (toDate(s.ts)) : null;
         const pct = parseInt(s.pct) || 0;
         const dom = s.sub || s.domain || '';
         const niv = s.niveau || '';
@@ -1842,8 +1877,12 @@ function renderJoueursInscrits() {
     const countLabel = document.getElementById('joueurs-count-label');
     if (!tbody) return;
 
-    // Trier : plus récent d'abord
-    const sorted = [...allJoueurs].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    // Trier : plus récent d'abord — toDate() gère tous les formats Firestore
+    const sorted = [...allJoueurs].sort((a, b) => {
+        const da = toDate(a.ts)?.getTime() ?? 0;
+        const db = toDate(b.ts)?.getTime() ?? 0;
+        return db - da;
+    });
     joueursInscritsData = sorted;
 
     countLabel.textContent = `${sorted.length} joueur${sorted.length > 1 ? 's' : ''}`;
@@ -1886,16 +1925,9 @@ function renderJoueursInscritsTable(joueurs) {
                 </button>
             </div>`;
 
-        // Dates
-        const tsInscription = j.ts
-            ? new Date(j.ts).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
-              + ' · ' + new Date(j.ts).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
-            : '—';
-
-        const tsUpdate = j.tsUpdate && j.tsUpdate !== j.ts
-            ? new Date(j.tsUpdate).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
-              + ' · ' + new Date(j.tsUpdate).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
-            : '—';
+        // Dates — toDate() gère Firestore Timestamp, number ET string
+        const tsInscription = formatDateTime(j.ts);
+        const tsUpdate = (j.tsUpdate && j.tsUpdate !== j.ts) ? formatDateTime(j.tsUpdate) : '—';
 
         return `<tr>
             <td>${i + 1}</td>
@@ -1977,10 +2009,8 @@ function filterEventsByPeriod(events, period) {
     const bounds = getDateBounds(period);
     if (!bounds) return events;
     return events.filter(ev => {
-        if (!ev.ts) return false;
-        // ts est en millisecondes (number) dans ces collections
-        const d = typeof ev.ts === 'number' ? new Date(ev.ts)
-                : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+        const d = toDate(ev.ts);
+        if (!d) return false;
         return d >= bounds.start && d <= bounds.end;
     });
 }
@@ -2013,8 +2043,7 @@ function renderEventsChart(events, period, barsEl, titleEl, scrollEl, colorKey) 
     // Normaliser le timestamp (ms number ou Firestore Timestamp)
     function getDate(ev) {
         if (!ev.ts) return null;
-        return typeof ev.ts === 'number' ? new Date(ev.ts)
-             : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+        return toDate(ev.ts);
     }
 
     if (period === 'day') {
@@ -2157,8 +2186,7 @@ function renderNouveauProfilChart(events, period, barsEl, titleEl, scrollEl) {
 
     function getDate(ev) {
         if (!ev.ts) return null;
-        return typeof ev.ts === 'number' ? new Date(ev.ts)
-             : ev.ts.toDate ? ev.ts.toDate() : new Date(ev.ts);
+        return toDate(ev.ts);
     }
 
     if (period === 'day') {
