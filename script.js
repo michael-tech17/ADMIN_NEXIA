@@ -1913,13 +1913,14 @@ function renderJoueursInscritsTable(joueurs) {
                     alt="${j.countryName || j.countryCode}" title="${j.countryName || j.countryCode}">`
             : '';
 
-        // PIN masqué avec bouton œil
-        const pinId  = `pin-${i}`;
-        const pinVal = j.pin || '????';
+        // Stocker le PIN en mémoire uniquement — JAMAIS dans le DOM
+        const pinId = `pin-${i}`;
+        _pinStore[i] = j.pin || null;
+
         const pinHtml = `
             <div class="pin-cell">
                 <span id="${pinId}" class="pin-value">••••</span>
-                <button class="pin-toggle-btn" onclick="togglePin('${pinId}','${pinVal}')"
+                <button class="pin-toggle-btn" onclick="togglePin('${pinId}', ${i})"
                     title="Afficher / Masquer le PIN">
                     <span class="material-symbols-outlined" id="${pinId}-eye">visibility</span>
                 </button>
@@ -1948,19 +1949,117 @@ function renderJoueursInscritsTable(joueurs) {
     }).join('');
 }
 
-// Toggle PIN masqué/visible
-window.togglePin = function(pinId, pinVal) {
+// ══════════════════════════════════════════════════════════════════
+// ── SYSTÈME DE DÉVERROUILLAGE DES PINS ───────────────────────────
+// ══════════════════════════════════════════════════════════════════
+
+// Table index → PIN (jamais exposée dans le DOM)
+const _pinStore = {};
+
+// PIN en attente (celui sur lequel l'admin a cliqué)
+let _pendingPinId  = null;
+let _pendingPinIdx = null;
+
+// ── Initialisation de la modale ───────────────────────────────────
+document.getElementById('pin-unlock-confirm-btn').addEventListener('click', handlePinUnlock);
+document.getElementById('pin-unlock-cancel-btn').addEventListener('click', closePinModal);
+document.getElementById('pin-unlock-pwd').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handlePinUnlock();
+    if (e.key === 'Escape') closePinModal();
+});
+document.getElementById('pin-unlock-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('pin-unlock-overlay')) closePinModal();
+});
+document.getElementById('pin-unlock-toggle-btn').addEventListener('click', () => {
+    const input = document.getElementById('pin-unlock-pwd');
+    const icon  = document.getElementById('pin-unlock-toggle-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+    } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+    }
+});
+
+function openPinModal(pinId, index) {
+    _pendingPinId  = pinId;
+    _pendingPinIdx = index;
+    const errEl = document.getElementById('pin-unlock-error');
+    const input = document.getElementById('pin-unlock-pwd');
+    errEl.style.display = 'none';
+    input.value = '';
+    input.type  = 'password';
+    document.getElementById('pin-unlock-toggle-icon').textContent = 'visibility';
+    document.getElementById('pin-unlock-overlay').style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+}
+
+function closePinModal() {
+    document.getElementById('pin-unlock-overlay').style.display = 'none';
+    _pendingPinId  = null;
+    _pendingPinIdx = null;
+}
+
+async function handlePinUnlock() {
+    const pwd   = document.getElementById('pin-unlock-pwd').value.trim();
+    const errEl = document.getElementById('pin-unlock-error');
+    const btn   = document.getElementById('pin-unlock-confirm-btn');
+    if (!pwd) return;
+
+    btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">autorenew</span> Vérification…';
+    btn.disabled  = true;
+    errEl.style.display = 'none';
+
+    try {
+        const snap = await getDoc(doc(db, 'config', 'admin'));
+        const pinPassword = snap.exists() ? snap.data().pinPassword : null;
+
+        if (pinPassword && pwd === pinPassword) {
+            // ✅ Correct : afficher uniquement CE PIN et fermer la modale
+            const pendingId  = _pendingPinId;
+            const pendingIdx = _pendingPinIdx;
+            closePinModal();
+            revealPin(pendingId, pendingIdx);
+        } else {
+            errEl.style.display = 'block';
+            document.getElementById('pin-unlock-pwd').value = '';
+        }
+    } catch(e) {
+        console.error('Erreur vérification mot de passe PIN :', e);
+        errEl.textContent   = 'Erreur de connexion. Réessayez.';
+        errEl.style.display = 'block';
+    }
+
+    btn.innerHTML = '<span class="material-symbols-outlined">lock_open</span> Déverrouiller';
+    btn.disabled  = false;
+}
+
+// Clique sur l'œil → toujours demander le mot de passe
+// (que le PIN soit masqué ou visible → dès qu'on le remasque, il faut retaper)
+window.togglePin = function(pinId, index) {
+    const span = document.getElementById(pinId);
+    if (!span) return;
+
+    if (span.textContent === '••••') {
+        // PIN masqué → demander le mot de passe
+        openPinModal(pinId, index);
+    } else {
+        // PIN visible → remasquer (sans demander de mot de passe)
+        span.textContent = '••••';
+        document.getElementById(pinId + '-eye').textContent = 'visibility';
+    }
+};
+
+// Affiche le PIN depuis _pinStore — jamais depuis le DOM
+function revealPin(pinId, index) {
     const span = document.getElementById(pinId);
     const eye  = document.getElementById(pinId + '-eye');
     if (!span) return;
-    if (span.textContent === '••••') {
-        span.textContent   = pinVal;
-        eye.textContent    = 'visibility_off';
-    } else {
-        span.textContent   = '••••';
-        eye.textContent    = 'visibility';
-    }
-};
+    const pinVal = _pinStore[index];
+    span.textContent = pinVal || '—';
+    eye.textContent  = 'visibility_off';
+}
 
 // Recherche dans le tableau joueurs inscrits
 document.getElementById('joueurs-search')?.addEventListener('input', (e) => {

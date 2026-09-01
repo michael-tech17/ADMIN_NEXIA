@@ -11,6 +11,32 @@
 </head>
 <body>
 
+<!-- ── MODALE : DÉVERROUILLAGE DES PINS ─────────────────────── -->
+<div id="pin-unlock-overlay" style="display:none;">
+    <div id="pin-unlock-modal">
+        <span class="material-symbols-outlined" style="font-size:36px;color:var(--primary)">lock</span>
+        <h2>Accès protégé</h2>
+        <p>Entrez le mot de passe pour afficher les PINs des joueurs.</p>
+        <div class="pwd-wrap">
+            <input type="password" id="pin-unlock-pwd" placeholder="Mot de passe PINs..." autocomplete="off" />
+            <button type="button" class="pwd-toggle" id="pin-unlock-toggle-btn">
+                <span class="material-symbols-outlined" id="pin-unlock-toggle-icon">visibility</span>
+            </button>
+        </div>
+        <p class="login-error" id="pin-unlock-error" style="display:none;">Mot de passe incorrect.</p>
+        <div class="modal-actions">
+            <button id="pin-unlock-cancel-btn" class="btn-secondary-modal">
+                <span class="material-symbols-outlined" style="font-size:16px">close</span>
+                Annuler
+            </button>
+            <button id="pin-unlock-confirm-btn">
+                <span class="material-symbols-outlined">lock_open</span>
+                Déverrouiller
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="login-admin">
     <div class="login-box">
         <span class="material-symbols-outlined">admin_panel_settings</span>
