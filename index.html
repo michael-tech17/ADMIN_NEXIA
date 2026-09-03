@@ -548,6 +548,48 @@
             <div class="pagination" id="pagination-abandons"></div>
         </div>
 
+        <!-- ══ AVIS DES JOUEURS ══ -->
+        <div class="section-title">
+            <span class="material-symbols-outlined">rate_review</span>
+            Avis des joueurs
+        </div>
+        <div class="leaderboard-section" id="avis-section" style="margin-bottom:32px">
+            <div id="avis-kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label"><span class="material-symbols-outlined">star</span> Note moyenne</div>
+                    <div class="kpi-value" id="avis-note-moyenne" style="font-size:28px">—</div>
+                    <div class="kpi-sub">sur 5 étoiles</div>
+                </div>
+                <div class="kpi-card primary">
+                    <div class="kpi-label"><span class="material-symbols-outlined">reviews</span> Total avis</div>
+                    <div class="kpi-value" id="avis-total" style="font-size:28px">0</div>
+                    <div class="kpi-sub">avis enregistrés</div>
+                </div>
+                <div class="kpi-card success">
+                    <div class="kpi-label"><span class="material-symbols-outlined">chat</span> Avec commentaire</div>
+                    <div class="kpi-value" id="avis-avec-commentaire" style="font-size:28px">0</div>
+                    <div class="kpi-sub">avis avec texte</div>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="leaderboard-table" id="avis-table">
+                    <thead>
+                        <tr>
+                            <th style="width:48px">#</th>
+                            <th>Joueur</th>
+                            <th>Note</th>
+                            <th>Commentaire</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="avis-body">
+                        <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Aucun avis pour l'instant.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
         <!-- Analyse des réponses -->
         <div class="missed-section">
             <div class="missed-header">

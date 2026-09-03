@@ -1538,3 +1538,145 @@
     opacity: 0.5;
     vertical-align: middle;
 }
+
+/* ── AVIS — KPI intégrés dans leaderboard-section ─────────── */
+#avis-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#avis-kpi-grid .kpi-card {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-right: 1px solid var(--border-color);
+    padding: 20px 24px;
+}
+
+#avis-kpi-grid .kpi-card:last-child {
+    border-right: none;
+}
+
+/* Retirer le pseudo-élément coloré des kpi-card dans ces grids */
+#avis-kpi-grid .kpi-card::before {
+    display: none;
+}
+
+/* Étoiles dans le tableau des avis */
+.avis-stars {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+    color: var(--warning);
+    font-size: 16px;
+}
+
+.avis-stars .star-empty {
+    color: var(--border-color);
+}
+
+/* Note moyenne avec étoile */
+.avis-note-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.avis-note-display .material-symbols-outlined {
+    color: var(--warning);
+    font-size: 20px;
+}
+
+/* ── TABLE AVIS ──────────────────────────────────────────────────── */
+#avis-section .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 20px;
+}
+
+#avis-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+#avis-table thead tr {
+    background: var(--bg-element);
+    border-bottom: 2px solid var(--border-color);
+}
+
+#avis-table thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+#avis-table thead th:first-child {
+    width: 52px;
+    text-align: center;
+}
+
+#avis-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.12s;
+}
+
+#avis-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+#avis-table tbody tr:hover {
+    background: var(--bg-element);
+}
+
+#avis-table tbody td {
+    padding: 14px 16px;
+    vertical-align: middle;
+    color: var(--text-main);
+}
+
+#avis-table tbody td:first-child {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    width: 52px;
+}
+
+@media (max-width: 768px) {
+    #avis-table thead th,
+    #avis-table tbody td { padding: 12px 12px; }
+
+    #avis-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+
+    #avis-kpi-grid .kpi-card {
+        border-bottom: 1px solid var(--border-color);
+        border-right: none;
+    }
+    #avis-kpi-grid .kpi-card:nth-child(odd) {
+        border-right: 1px solid var(--border-color);
+    }
+    #avis-kpi-grid .kpi-card:last-child,
+    #avis-kpi-grid .kpi-card:nth-last-child(2):nth-child(odd) {
+        border-bottom: none;
+    }
+}
+
+@media (max-width: 480px) {
+    #avis-table { font-size: 13px; }
+
+    #avis-kpi-grid { grid-template-columns: 1fr; }
+
+    #avis-kpi-grid .kpi-card {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    #avis-kpi-grid .kpi-card:last-child { border-bottom: none; }
+}

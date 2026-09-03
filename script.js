@@ -243,6 +243,7 @@ async function loadAllData() {
             loadReponses(),
             loadResetPin(),
             loadNouveauProfil(),
+            loadAvis(),
         ]);
 
     } catch(e) {
@@ -2368,4 +2369,75 @@ function renderNouveauProfilChart(events, period, barsEl, titleEl, scrollEl) {
             <div class="freq-bar-label">${b.label}</div>
         </div>`;
     }).join('');
+}
+
+// ── AVIS DES JOUEURS ─────────────────────────────────────────────
+async function loadAvis() {
+    try {
+        const snap = await getDocs(
+            query(collection(db, "Avis"), orderBy("date", "desc"))
+        );
+        const avis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderAvis(avis);
+    } catch (e) {
+        console.warn('Collection Avis non trouvée ou erreur :', e);
+        renderAvis([]);
+    }
+}
+
+function renderAvis(avis) {
+    // KPIs
+    const total = avis.length;
+    const avecCommentaire = avis.filter(a => a.commentaire && a.commentaire.trim()).length;
+    const noteMoyenne = total
+        ? (avis.reduce((sum, a) => sum + (parseFloat(a.note) || 0), 0) / total).toFixed(1)
+        : null;
+
+    document.getElementById('avis-total').textContent = total;
+    document.getElementById('avis-avec-commentaire').textContent = avecCommentaire;
+
+    const noteEl = document.getElementById('avis-note-moyenne');
+    if (noteMoyenne) {
+        noteEl.innerHTML = `<span class="avis-note-display">
+            <span class="material-symbols-outlined" style="color:var(--warning);font-size:24px;vertical-align:middle">star</span>
+            ${noteMoyenne}
+        </span>`;
+    } else {
+        noteEl.textContent = '—';
+    }
+
+    // Tableau
+    const tbody = document.getElementById('avis-body');
+    if (avis.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Aucun avis pour l'instant.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = avis.map((a, i) => {
+        const note = parseFloat(a.note) || 0;
+        const stars = Array.from({ length: 5 }, (_, idx) =>
+            `<span class="material-symbols-outlined" style="font-size:16px;color:${idx < note ? 'var(--warning)' : 'var(--border-color)'}">star</span>`
+        ).join('');
+
+        const commentaire = a.commentaire
+            ? `<span style="color:var(--text-main)">${escapeHtml(a.commentaire)}</span>`
+            : `<span style="color:var(--text-muted);font-style:italic">—</span>`;
+
+        return `<tr>
+            <td style="color:var(--text-muted);font-size:13px">${i + 1}</td>
+            <td style="font-weight:500">${escapeHtml(a.joueur || a.name || 'Anonyme')}</td>
+            <td><span class="avis-stars">${stars}</span></td>
+            <td style="max-width:340px;word-break:break-word">${commentaire}</td>
+            <td style="color:var(--text-muted);white-space:nowrap;font-size:13px">${formatDateTime(a.date || a.ts)}</td>
+        </tr>`;
+    }).join('');
+}
+
+
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
