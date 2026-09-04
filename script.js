@@ -1962,12 +1962,10 @@ let _pendingPinId  = null;
 let _pendingPinIdx = null;
 
 // ── Initialisation de la modale ───────────────────────────────────
-document.getElementById('pin-unlock-confirm-btn').addEventListener('click', handlePinUnlock);
+// NOTE : le bouton confirm et le keydown Enter sont gérés plus bas
+// par handlePinUnlockUnified (qui couvre à la fois les joueurs inscrits et les logs).
+// On enregistre seulement le bouton Annuler ici.
 document.getElementById('pin-unlock-cancel-btn').addEventListener('click', closePinModal);
-document.getElementById('pin-unlock-pwd').addEventListener('keydown', e => {
-    if (e.key === 'Enter') handlePinUnlock();
-    if (e.key === 'Escape') closePinModal();
-});
 document.getElementById('pin-unlock-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('pin-unlock-overlay')) closePinModal();
 });
@@ -2002,38 +2000,10 @@ function closePinModal() {
     _pendingPinIdx = null;
 }
 
+// handlePinUnlock est remplacé par handlePinUnlockUnified (défini plus bas)
+// Cette fonction vide est conservée pour éviter toute référence cassée
 async function handlePinUnlock() {
-    const pwd   = document.getElementById('pin-unlock-pwd').value.trim();
-    const errEl = document.getElementById('pin-unlock-error');
-    const btn   = document.getElementById('pin-unlock-confirm-btn');
-    if (!pwd) return;
-
-    btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">autorenew</span> Vérification…';
-    btn.disabled  = true;
-    errEl.style.display = 'none';
-
-    try {
-        const snap = await getDoc(doc(db, 'config', 'admin'));
-        const pinPassword = snap.exists() ? snap.data().pinPassword : null;
-
-        if (pinPassword && pwd === pinPassword) {
-            // ✅ Correct : afficher uniquement CE PIN et fermer la modale
-            const pendingId  = _pendingPinId;
-            const pendingIdx = _pendingPinIdx;
-            closePinModal();
-            revealPin(pendingId, pendingIdx);
-        } else {
-            errEl.style.display = 'block';
-            document.getElementById('pin-unlock-pwd').value = '';
-        }
-    } catch(e) {
-        console.error('Erreur vérification mot de passe PIN :', e);
-        errEl.textContent   = 'Erreur de connexion. Réessayez.';
-        errEl.style.display = 'block';
-    }
-
-    btn.innerHTML = '<span class="material-symbols-outlined">lock_open</span> Déverrouiller';
-    btn.disabled  = false;
+    // Délégué à handlePinUnlockUnified
 }
 
 // Clique sur l'œil → toujours demander le mot de passe
@@ -2132,6 +2102,7 @@ function renderResetPin() {
     paysEl.textContent = pays || '—';
 
     renderEventsChart(allResetPin, currentResetPinPeriod, barsEl, titleEl, scrollEl, 'resetpin');
+    renderResetPinLog();
 }
 
 function renderEventsChart(events, period, barsEl, titleEl, scrollEl, colorKey) {
@@ -2276,6 +2247,7 @@ function renderNouveauProfil() {
     paysEl.textContent = pays || '—';
 
     renderNouveauProfilChart(allNouveauProfil, currentNouveauProfilPeriod, barsEl, titleEl, scrollEl);
+    renderNouveauProfilLog();
 }
 
 function renderNouveauProfilChart(events, period, barsEl, titleEl, scrollEl) {
@@ -2371,43 +2343,288 @@ function renderNouveauProfilChart(events, period, barsEl, titleEl, scrollEl) {
     }).join('');
 }
 
-// ── AVIS DES JOUEURS ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// ── AVIS DES JOUEURS (complet) ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let allAvis = [];
+let currentAvisPeriod = 'day';
+
+document.querySelectorAll('.avis-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentAvisPeriod = btn.dataset.period;
+        document.querySelectorAll('.avis-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAvisChart();
+    });
+});
+
 async function loadAvis() {
     try {
         const snap = await getDocs(
             query(collection(db, "Avis"), orderBy("date", "desc"))
         );
-        const avis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderAvis(avis);
+        allAvis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) {
-        console.warn('Collection Avis non trouvée ou erreur :', e);
-        renderAvis([]);
+        // Essai avec champ "ts" si "date" inexistant
+        try {
+            const snap2 = await getDocs(
+                query(collection(db, "Avis"), orderBy("ts", "desc"))
+            );
+            allAvis = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch(e2) {
+            console.warn('Collection Avis non trouvée ou erreur :', e2);
+            allAvis = [];
+        }
     }
+    renderAvis(allAvis);
 }
 
 function renderAvis(avis) {
-    // KPIs
     const total = avis.length;
     const avecCommentaire = avis.filter(a => a.commentaire && a.commentaire.trim()).length;
     const noteMoyenne = total
         ? (avis.reduce((sum, a) => sum + (parseFloat(a.note) || 0), 0) / total).toFixed(1)
         : null;
 
+    // KPIs
     document.getElementById('avis-total').textContent = total;
     document.getElementById('avis-avec-commentaire').textContent = avecCommentaire;
 
+    // Joueurs distincts
+    const joueursDistincts = new Set(avis.map(a => (a.joueur || a.name || '').toLowerCase().trim()).filter(Boolean));
+    const joueursCountEl = document.getElementById('avis-joueurs-count');
+    if (joueursCountEl) joueursCountEl.textContent = joueursDistincts.size;
+
     const noteEl = document.getElementById('avis-note-moyenne');
-    if (noteMoyenne) {
-        noteEl.innerHTML = `<span class="avis-note-display">
-            <span class="material-symbols-outlined" style="color:var(--warning);font-size:24px;vertical-align:middle">star</span>
-            ${noteMoyenne}
-        </span>`;
-    } else {
-        noteEl.textContent = '—';
+    if (noteEl) {
+        if (noteMoyenne) {
+            noteEl.innerHTML = `<span class="avis-note-display">
+                <span class="material-symbols-outlined" style="color:var(--warning);font-size:24px;vertical-align:middle">star</span>
+                ${noteMoyenne}
+            </span>`;
+        } else {
+            noteEl.textContent = '—';
+        }
     }
 
-    // Tableau
+    // Graphe
+    renderAvisChart();
+
+    // Section par joueur
+    renderAvisParJoueur(avis);
+
+    // Tableau global
+    renderAvisTable(avis);
+}
+
+function getAvisTimestamp(a) {
+    // Supporte date ou ts, Firestore Timestamp ou string ISO ou number
+    return toDate(a.date || a.ts);
+}
+
+function renderAvisChart() {
+    const barsEl  = document.getElementById('avis-bars');
+    const titleEl = document.getElementById('avis-chart-title');
+    const scrollEl = document.getElementById('avis-bars-scroll-wrap');
+    if (!barsEl) return;
+
+    const mois  = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const now   = new Date();
+    let buckets = [];
+
+    function getDate(a) { return getAvisTimestamp(a); }
+
+    if (currentAvisPeriod === 'day') {
+        titleEl.textContent = "Avis par heure aujourd'hui";
+        for (let h = 0; h < 24; h++) {
+            const count = allAvis.filter(a => {
+                const d = getDate(a); if (!d) return false;
+                return d.toDateString() === now.toDateString() && d.getHours() === h;
+            }).length;
+            buckets.push({ label: h + 'h', count, isFuture: h > now.getHours() });
+        }
+    } else if (currentAvisPeriod === 'week') {
+        titleEl.textContent = 'Avis des 7 derniers jours';
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now); d.setDate(d.getDate() - i);
+            const count = allAvis.filter(a => {
+                const ed = getDate(a); if (!ed) return false;
+                return ed.toDateString() === d.toDateString();
+            }).length;
+            buckets.push({ label: jours[(d.getDay() + 6) % 7], count });
+        }
+    } else if (currentAvisPeriod === 'month') {
+        titleEl.textContent = 'Avis par semaine ce mois';
+        const year = now.getFullYear(), month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let w = 1; w <= 5; w++) {
+            const from = (w-1)*7+1, to = Math.min(w*7, daysInMonth);
+            if (from > daysInMonth) break;
+            const count = allAvis.filter(a => {
+                const d = getDate(a); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === month && d.getDate() >= from && d.getDate() <= to;
+            }).length;
+            buckets.push({ label: 'S'+w, count });
+        }
+    } else if (currentAvisPeriod === 'year') {
+        titleEl.textContent = 'Avis par mois cette année';
+        const year = now.getFullYear();
+        for (let m = 0; m <= now.getMonth(); m++) {
+            const count = allAvis.filter(a => {
+                const d = getDate(a); if (!d) return false;
+                return d.getFullYear() === year && d.getMonth() === m;
+            }).length;
+            buckets.push({ label: mois[m], count });
+        }
+    } else {
+        titleEl.textContent = 'Avis par année (total)';
+        const years = {};
+        allAvis.forEach(a => {
+            const d = getDate(a); if (!d) return;
+            const y = d.getFullYear();
+            years[y] = (years[y] || 0) + 1;
+        });
+        Object.keys(years).sort().forEach(y => buckets.push({ label: y, count: years[y] }));
+    }
+
+    if (buckets.every(b => b.count === 0)) {
+        barsEl.innerHTML = `<div class="empty-msg" style="padding:20px 0;width:100%">
+            <span class="material-symbols-outlined" style="animation:none;font-size:28px">bar_chart_off</span>
+            Aucun avis pour cette période.
+        </div>`;
+        return;
+    }
+
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const is24h = currentAvisPeriod === 'day';
+    if (scrollEl) {
+        scrollEl.style.overflowX = is24h ? 'auto' : 'visible';
+        barsEl.style.minWidth    = is24h ? (buckets.length * 36) + 'px' : '';
+    }
+
+    barsEl.innerHTML = buckets.map(b => {
+        const pct = Math.max(Math.round((b.count / maxCount) * 100), b.count > 0 ? 4 : 0);
+        const isFuture = b.isFuture || false;
+        // Couleur dorée/warning pour les avis
+        const barStyle = isFuture
+            ? `height:${pct}%;opacity:0.18;background:var(--border-color)`
+            : `height:${pct}%;background:var(--warning)`;
+        return `<div class="freq-bar-col${isFuture ? ' freq-bar-future' : ''}">
+            <div class="freq-bar-count">${b.count > 0 && !isFuture ? b.count : ''}</div>
+            <div class="freq-bar" style="${barStyle}" title="${b.label} : ${isFuture ? 'à venir' : b.count + ' avis'}"></div>
+            <div class="freq-bar-label">${b.label}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderAvisParJoueur(avis) {
+    const container = document.getElementById('avis-par-joueur-container');
+    if (!container) return;
+
+    if (avis.length === 0) {
+        container.innerHTML = `<div class="empty-msg" style="padding:24px">
+            <span class="material-symbols-outlined" style="animation:none">rate_review</span>
+            Aucun avis enregistré pour l'instant.
+        </div>`;
+        return;
+    }
+
+    // Regrouper par joueur
+    const parJoueur = {};
+    avis.forEach(a => {
+        const nom = (a.joueur || a.name || 'Anonyme').trim();
+        const key = nom.toLowerCase();
+        if (!parJoueur[key]) parJoueur[key] = { nom, avis: [] };
+        parJoueur[key].avis.push(a);
+    });
+
+    // Trier par nb d'avis décroissant
+    const sorted = Object.values(parJoueur).sort((a, b) => b.avis.length - a.avis.length);
+
+    function makeStars(note) {
+        const n = parseFloat(note) || 0;
+        return Array.from({ length: 5 }, (_, i) =>
+            `<span class="material-symbols-outlined" style="font-size:15px;color:${i < n ? 'var(--warning)' : 'var(--border-color)'}">star</span>`
+        ).join('');
+    }
+
+    container.innerHTML = sorted.map((joueur, idx) => {
+        const count = joueur.avis.length;
+        const pct   = Math.round((count / 3) * 100);
+        const cls   = count >= 3 ? 'full' : count === 2 ? 'partial' : 'single';
+        const fillCls = cls;
+        const label = count >= 3 ? '3/3 avis' : `${count}/3 avis`;
+
+        // Moyenne de ses avis
+        const moy = (joueur.avis.reduce((s, a) => s + (parseFloat(a.note) || 0), 0) / count).toFixed(1);
+
+        // Chercher avatar
+        const joueurInfo = allJoueurs.find(j => (j.name || '').toLowerCase() === joueur.nom.toLowerCase());
+        const avatarHtml = joueurInfo?.avatarId
+            ? `<div class="admin-avatar">${getAvatarImgAdmin(joueurInfo.avatarId)}</div>`
+            : `<div class="admin-avatar"><span style="font-size:20px">🦕</span></div>`;
+
+        // Drapeau
+        const flagHtml = joueurInfo?.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${joueurInfo.countryCode.toLowerCase()}.png" alt="${joueurInfo.countryName || ''}" title="${joueurInfo.countryName || ''}">`
+            : '';
+
+        // Détail des avis (triés par date croissante pour numérotation)
+        const avisTries = [...joueur.avis].sort((a, b) => {
+            const da = getAvisTimestamp(a)?.getTime() || 0;
+            const db = getAvisTimestamp(b)?.getTime() || 0;
+            return da - db;
+        });
+
+        const detailItems = avisTries.map((a, i) => {
+            const commentaire = a.commentaire && a.commentaire.trim()
+                ? `<div class="avis-detail-comment">${escapeHtml(a.commentaire)}</div>`
+                : `<div class="avis-detail-comment" style="color:var(--text-muted);font-style:italic">Pas de commentaire</div>`;
+            return `<div class="avis-detail-item">
+                <div class="avis-detail-num">${i + 1}</div>
+                <div class="avis-detail-content">
+                    <div class="avis-detail-stars">${makeStars(a.note)}</div>
+                    ${commentaire}
+                    <div class="avis-detail-date">${formatDateTime(a.date || a.ts)}</div>
+                </div>
+            </div>`;
+        }).join('');
+
+        return `<div class="avis-joueur-row" id="avis-row-${idx}">
+            <div class="avis-joueur-header" onclick="toggleAvisRow(${idx})">
+                ${avatarHtml}
+                ${flagHtml}
+                <span class="avis-joueur-name">${escapeHtml(joueur.nom)}</span>
+                <div class="avis-moy-joueur">
+                    <span class="material-symbols-outlined" style="font-size:15px">star</span>
+                    ${moy}
+                </div>
+                <div class="avis-progress-wrap">
+                    <div class="avis-progress-bar">
+                        <div class="avis-progress-fill ${fillCls}" style="width:${pct}%"></div>
+                    </div>
+                    <span class="avis-progress-label">${label}</span>
+                </div>
+                <span class="avis-count-badge ${cls}">${count} avis</span>
+                <span class="material-symbols-outlined avis-chevron">expand_more</span>
+            </div>
+            <div class="avis-joueur-detail">
+                ${detailItems}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.toggleAvisRow = function(idx) {
+    const row = document.getElementById('avis-row-' + idx);
+    if (row) row.classList.toggle('open');
+};
+
+function renderAvisTable(avis) {
     const tbody = document.getElementById('avis-body');
+    if (!tbody) return;
+
     if (avis.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Aucun avis pour l'instant.</td></tr>`;
         return;
@@ -2419,12 +2636,12 @@ function renderAvis(avis) {
             `<span class="material-symbols-outlined" style="font-size:16px;color:${idx < note ? 'var(--warning)' : 'var(--border-color)'}">star</span>`
         ).join('');
 
-        const commentaire = a.commentaire
+        const commentaire = a.commentaire && a.commentaire.trim()
             ? `<span style="color:var(--text-main)">${escapeHtml(a.commentaire)}</span>`
             : `<span style="color:var(--text-muted);font-style:italic">—</span>`;
 
         return `<tr>
-            <td style="color:var(--text-muted);font-size:13px">${i + 1}</td>
+            <td style="color:var(--text-muted);font-size:13px;text-align:center">${i + 1}</td>
             <td style="font-weight:500">${escapeHtml(a.joueur || a.name || 'Anonyme')}</td>
             <td><span class="avis-stars">${stars}</span></td>
             <td style="max-width:340px;word-break:break-word">${commentaire}</td>
@@ -2433,6 +2650,309 @@ function renderAvis(avis) {
     }).join('');
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// ── TABLEAU LOG RESETPIN ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let resetPinLogPage = 1;
+const RESETPIN_LOG_PAGE_SIZE = 15;
+
+function renderResetPinLog() {
+    const tbody  = document.getElementById('resetpin-log-body');
+    const pgEl   = document.getElementById('pagination-resetpin-log');
+    if (!tbody) return;
+
+    const data = [...allResetPin].sort((a, b) => {
+        const da = toDate(a.ts)?.getTime() || 0;
+        const db = toDate(b.ts)?.getTime() || 0;
+        return db - da; // plus récent en premier
+    });
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">
+            <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:8px;animation:none">key_off</span>
+            Aucune réinitialisation enregistrée.<br>
+            <span style="font-size:12px;margin-top:6px;display:block">Vérifiez que la collection <code>ResetPin</code> existe dans Firebase.</span>
+        </td></tr>`;
+        if (pgEl) pgEl.innerHTML = '';
+        return;
+    }
+
+    const total = Math.ceil(data.length / RESETPIN_LOG_PAGE_SIZE);
+    const start = (resetPinLogPage - 1) * RESETPIN_LOG_PAGE_SIZE;
+    const page  = data.slice(start, start + RESETPIN_LOG_PAGE_SIZE);
+
+    tbody.innerHTML = page.map((ev, i) => {
+        const rank = start + i + 1;
+
+        // Joueur
+        const joueurInfo = allJoueurs.find(j => (j.name || '').toLowerCase() === (ev.name || ev.joueur || '').toLowerCase());
+        const avatarHtml = joueurInfo?.avatarId
+            ? `<div class="admin-avatar" style="display:inline-flex">${getAvatarImgAdmin(joueurInfo.avatarId)}</div>`
+            : `<div class="admin-avatar" style="display:inline-flex"><span style="font-size:18px">🦕</span></div>`;
+
+        const flagHtml = ev.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${ev.countryCode.toLowerCase()}.png" alt="${ev.countryName || ev.countryCode}" title="${ev.countryName || ev.countryCode}">`
+            : '';
+
+        const nomJoueur = escapeHtml(ev.name || ev.joueur || 'Inconnu');
+
+        // Ancien PIN (masqué par défaut, révélable)
+        const oldPinId  = `rp-old-${start + i}`;
+        const newPinId  = `rp-new-${start + i}`;
+        const oldPinVal = ev.ancienPin || ev.oldPin || ev.previousPin || null;
+        const newPinVal = ev.nouveauPin || ev.newPin || ev.pin || null;
+
+        // Stocker dans _pinStore avec un préfixe unique pour ne pas écraser les joueurs
+        _pinStore['rp_old_' + (start + i)] = oldPinVal;
+        _pinStore['rp_new_' + (start + i)] = newPinVal;
+
+        function pinCell(pinId, storeKey, hasVal) {
+            if (!hasVal) return `<span style="color:var(--text-muted);font-style:italic">—</span>`;
+            return `<div class="pin-cell">
+                <span id="${pinId}" class="pin-value log-pin-val">••••</span>
+                <button class="pin-toggle-btn" onclick="toggleLogPin('${pinId}','${storeKey}')" title="Afficher / Masquer">
+                    <span class="material-symbols-outlined" id="${pinId}-eye">visibility</span>
+                </button>
+            </div>`;
+        }
+
+        // Raison
+        const raison = ev.raison || ev.reason || 'PIN oublié';
+        const raisonHtml = `<span class="reason-chip">
+            <span class="material-symbols-outlined" style="font-size:13px">help</span>
+            ${escapeHtml(raison)}
+        </span>`;
+
+        // Pays
+        const paysHtml = ev.countryCode
+            ? `<div style="display:flex;align-items:center;gap:6px">${flagHtml}<span style="font-size:12px">${escapeHtml(ev.countryName || ev.countryCode)}</span></div>`
+            : '—';
+
+        return `<tr>
+            <td style="color:var(--text-muted);font-size:12px;text-align:center">${rank}</td>
+            <td>
+                <div class="player-cell">
+                    ${avatarHtml}
+                    <strong>${nomJoueur}</strong>
+                </div>
+            </td>
+            <td>${pinCell(oldPinId, 'rp_old_' + (start + i), !!oldPinVal)}</td>
+            <td>${pinCell(newPinId, 'rp_new_' + (start + i), !!newPinVal)}</td>
+            <td>${paysHtml}</td>
+            <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">${formatDateTime(ev.ts)}</td>
+            <td>${raisonHtml}</td>
+        </tr>`;
+    }).join('');
+
+    // Pagination
+    if (!pgEl) return;
+    if (total <= 1) { pgEl.innerHTML = ''; return; }
+    let html = `<button class="page-btn" id="pg-rp-prev" ${resetPinLogPage===1?'disabled':''}>‹ Préc.</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - resetPinLogPage) <= 2) {
+            html += `<button class="page-btn ${i===resetPinLogPage?'active':''}" data-rp-page="${i}">${i}</button>`;
+        } else if (Math.abs(i - resetPinLogPage) === 3) {
+            html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+        }
+    }
+    html += `<button class="page-btn" id="pg-rp-next" ${resetPinLogPage===total?'disabled':''}>Suiv. ›</button>`;
+    pgEl.innerHTML = html;
+    pgEl.querySelectorAll('[data-rp-page]').forEach(btn => {
+        btn.addEventListener('click', () => { resetPinLogPage = parseInt(btn.dataset.rpPage); renderResetPinLog(); });
+    });
+    pgEl.querySelector('#pg-rp-prev')?.addEventListener('click', () => { if(resetPinLogPage>1){resetPinLogPage--;renderResetPinLog();} });
+    pgEl.querySelector('#pg-rp-next')?.addEventListener('click', () => { if(resetPinLogPage<total){resetPinLogPage++;renderResetPinLog();} });
+}
+
+// Révéler un PIN dans les tableaux de log (même modale que les joueurs inscrits)
+let _pendingLogPinId  = null;
+let _pendingLogStoreKey = null;
+
+window.toggleLogPin = function(pinId, storeKey) {
+    const span = document.getElementById(pinId);
+    if (!span) return;
+    if (span.textContent === '••••') {
+        // Demander le mot de passe
+        _pendingLogPinId    = pinId;
+        _pendingLogStoreKey = storeKey;
+        openLogPinModal();
+    } else {
+        span.textContent = '••••';
+        document.getElementById(pinId + '-eye').textContent = 'visibility';
+    }
+};
+
+function openLogPinModal() {
+    const errEl = document.getElementById('pin-unlock-error');
+    const input = document.getElementById('pin-unlock-pwd');
+    errEl.style.display = 'none';
+    input.value = '';
+    input.type  = 'password';
+    document.getElementById('pin-unlock-toggle-icon').textContent = 'visibility';
+    document.getElementById('pin-unlock-overlay').style.display = 'flex';
+    // On ne touche PAS à _pendingPinId/_pendingPinIdx ici ;
+    // handlePinUnlockUnified détecte le contexte via _pendingLogPinId
+    setTimeout(() => input.focus(), 100);
+}
+
+// Enregistrement du handler unifié (gère joueurs inscrits + logs)
+document.getElementById('pin-unlock-confirm-btn').addEventListener('click', handlePinUnlockUnified);
+document.getElementById('pin-unlock-pwd').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handlePinUnlockUnified();
+    if (e.key === 'Escape') closePinModal();
+});
+
+async function handlePinUnlockUnified() {
+    const pwd   = document.getElementById('pin-unlock-pwd').value.trim();
+    const errEl = document.getElementById('pin-unlock-error');
+    const btn   = document.getElementById('pin-unlock-confirm-btn');
+    if (!pwd) return;
+
+    btn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">autorenew</span> Vérification…';
+    btn.disabled  = true;
+    errEl.style.display = 'none';
+
+    try {
+        const snap = await getDoc(doc(db, 'config', 'admin'));
+        const pinPassword = snap.exists() ? snap.data().pinPassword : null;
+
+        if (pinPassword && pwd === pinPassword) {
+            if (_pendingLogPinId && _pendingLogStoreKey) {
+                // Contexte log
+                const pendingId  = _pendingLogPinId;
+                const pendingKey = _pendingLogStoreKey;
+                closePinModal();
+                _pendingLogPinId    = null;
+                _pendingLogStoreKey = null;
+                const span = document.getElementById(pendingId);
+                const eye  = document.getElementById(pendingId + '-eye');
+                if (span) span.textContent = _pinStore[pendingKey] || '—';
+                if (eye)  eye.textContent  = 'visibility_off';
+            } else if (_pendingPinId !== null) {
+                // Contexte joueurs inscrits
+                const pendingId  = _pendingPinId;
+                const pendingIdx = _pendingPinIdx;
+                closePinModal();
+                revealPin(pendingId, pendingIdx);
+            } else {
+                closePinModal();
+            }
+        } else {
+            errEl.style.display = 'block';
+            document.getElementById('pin-unlock-pwd').value = '';
+        }
+    } catch(e) {
+        console.error('Erreur vérification mot de passe PIN :', e);
+        errEl.textContent   = 'Erreur de connexion. Réessayez.';
+        errEl.style.display = 'block';
+    }
+
+    btn.innerHTML = '<span class="material-symbols-outlined">lock_open</span> Déverrouiller';
+    btn.disabled  = false;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ── TABLEAU LOG NOUVEAU PROFIL ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+let nouveauProfilLogPage = 1;
+const NOUVEAUPROFIL_LOG_PAGE_SIZE = 15;
+
+function renderNouveauProfilLog() {
+    const tbody = document.getElementById('nouveauprofil-log-body');
+    const pgEl  = document.getElementById('pagination-nouveauprofil-log');
+    if (!tbody) return;
+
+    const data = [...allNouveauProfil].sort((a, b) => {
+        const da = toDate(a.ts)?.getTime() || 0;
+        const db = toDate(b.ts)?.getTime() || 0;
+        return db - da;
+    });
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">
+            <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:8px;animation:none">person_add</span>
+            Aucun nouveau profil enregistré.<br>
+            <span style="font-size:12px;margin-top:6px;display:block">Vérifiez que la collection <code>NouveauProfil</code> existe dans Firebase.</span>
+        </td></tr>`;
+        if (pgEl) pgEl.innerHTML = '';
+        return;
+    }
+
+    const total = Math.ceil(data.length / NOUVEAUPROFIL_LOG_PAGE_SIZE);
+    const start = (nouveauProfilLogPage - 1) * NOUVEAUPROFIL_LOG_PAGE_SIZE;
+    const page  = data.slice(start, start + NOUVEAUPROFIL_LOG_PAGE_SIZE);
+
+    tbody.innerHTML = page.map((ev, i) => {
+        const rank = start + i + 1;
+
+        // Ancien profil
+        const ancienNom = ev.ancienNom || ev.oldName || ev.previousName || ev.name || '—';
+        const ancienAvatarId = ev.ancienAvatarId || ev.oldAvatarId || null;
+        const ancienAvatar = ancienAvatarId
+            ? `<span style="font-size:20px">${getAvatarEmojiAdmin(ancienAvatarId)}</span>`
+            : `<span style="font-size:20px">🦕</span>`;
+
+        // Nouveau profil
+        const nouveauNom = ev.nouveauNom || ev.newName || ev.nomNouveau || '—';
+        const nouveauAvatarId = ev.nouveauAvatarId || ev.newAvatarId || ev.avatarId || null;
+        const nouveauAvatar = nouveauAvatarId
+            ? `<span style="font-size:20px">${getAvatarEmojiAdmin(nouveauAvatarId)}</span>`
+            : `<span style="font-size:20px">🦕</span>`;
+
+        // Pays
+        const flagHtml = ev.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${ev.countryCode.toLowerCase()}.png" alt="${ev.countryName || ev.countryCode}" title="${ev.countryName || ev.countryCode}">`
+            : '';
+        const paysHtml = ev.countryCode
+            ? `<div style="display:flex;align-items:center;gap:6px">${flagHtml}<span style="font-size:12px">${escapeHtml(ev.countryName || ev.countryCode)}</span></div>`
+            : '—';
+
+        return `<tr>
+            <td style="color:var(--text-muted);font-size:12px;text-align:center">${rank}</td>
+            <td>
+                <div class="profil-transition-cell">
+                    <div class="admin-avatar" style="display:inline-flex">${ancienAvatar}</div>
+                    <div>
+                        <strong style="font-size:13px">${escapeHtml(ancienNom)}</strong>
+                        ${ev.ancienPin || ev.oldPin ? `<div style="font-size:11px;color:var(--text-muted)">PIN : ••••</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="profil-transition-cell">
+                    <span class="material-symbols-outlined profil-transition-arrow">arrow_forward</span>
+                    <div class="admin-avatar" style="display:inline-flex">${nouveauAvatar}</div>
+                    <div>
+                        <strong style="font-size:13px;color:var(--success)">${escapeHtml(nouveauNom)}</strong>
+                        <div style="font-size:11px;color:var(--text-muted)">Nouveau profil</div>
+                    </div>
+                </div>
+            </td>
+            <td>${paysHtml}</td>
+            <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">${formatDateTime(ev.ts)}</td>
+        </tr>`;
+    }).join('');
+
+    // Pagination
+    if (!pgEl) return;
+    if (total <= 1) { pgEl.innerHTML = ''; return; }
+    let html = `<button class="page-btn" id="pg-np-prev" ${nouveauProfilLogPage===1?'disabled':''}>‹ Préc.</button>`;
+    for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - nouveauProfilLogPage) <= 2) {
+            html += `<button class="page-btn ${i===nouveauProfilLogPage?'active':''}" data-np-page="${i}">${i}</button>`;
+        } else if (Math.abs(i - nouveauProfilLogPage) === 3) {
+            html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+        }
+    }
+    html += `<button class="page-btn" id="pg-np-next" ${nouveauProfilLogPage===total?'disabled':''}>Suiv. ›</button>`;
+    pgEl.innerHTML = html;
+    pgEl.querySelectorAll('[data-np-page]').forEach(btn => {
+        btn.addEventListener('click', () => { nouveauProfilLogPage = parseInt(btn.dataset.npPage); renderNouveauProfilLog(); });
+    });
+    pgEl.querySelector('#pg-np-prev')?.addEventListener('click', () => { if(nouveauProfilLogPage>1){nouveauProfilLogPage--;renderNouveauProfilLog();} });
+    pgEl.querySelector('#pg-np-next')?.addEventListener('click', () => { if(nouveauProfilLogPage<total){nouveauProfilLogPage++;renderNouveauProfilLog();} });
+}
 
 function escapeHtml(str) {
     return String(str || '')

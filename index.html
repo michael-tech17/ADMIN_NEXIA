@@ -284,6 +284,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tableau de log ResetPin -->
+            <div class="log-section-title">
+                <span class="material-symbols-outlined">history</span>
+                Historique détaillé des réinitialisations
+            </div>
+            <div class="table-wrap" style="margin-top:0">
+                <table class="leaderboard-table" id="resetpin-log-table">
+                    <thead>
+                        <tr>
+                            <th style="width:48px">#</th>
+                            <th>Joueur</th>
+                            <th>Ancien code PIN</th>
+                            <th>Nouveau code PIN</th>
+                            <th>Pays</th>
+                            <th>Date de réinitialisation</th>
+                            <th>Raison</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resetpin-log-body">
+                        <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">
+                            <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:8px">autorenew</span>
+                            Chargement…
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination-resetpin-log"></div>
         </div>
 
         <!-- ══ NOUVEAU PROFIL ══ -->
@@ -333,6 +361,32 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tableau de log NouveauProfil -->
+            <div class="log-section-title">
+                <span class="material-symbols-outlined">history</span>
+                Historique détaillé — ancien profil → nouveau profil
+            </div>
+            <div class="table-wrap" style="margin-top:0">
+                <table class="leaderboard-table" id="nouveauprofil-log-table">
+                    <thead>
+                        <tr>
+                            <th style="width:48px">#</th>
+                            <th>Ancien profil</th>
+                            <th>Nouveau profil créé</th>
+                            <th>Pays</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nouveauprofil-log-body">
+                        <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">
+                            <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:8px">autorenew</span>
+                            Chargement…
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination-nouveauprofil-log"></div>
         </div>
 
         <!-- ══ LISTE DES JOUEURS INSCRITS ══ -->
@@ -554,6 +608,7 @@
             Avis des joueurs
         </div>
         <div class="leaderboard-section" id="avis-section" style="margin-bottom:32px">
+            <!-- KPIs -->
             <div id="avis-kpi-grid">
                 <div class="kpi-card">
                     <div class="kpi-label"><span class="material-symbols-outlined">star</span> Note moyenne</div>
@@ -563,15 +618,54 @@
                 <div class="kpi-card primary">
                     <div class="kpi-label"><span class="material-symbols-outlined">reviews</span> Total avis</div>
                     <div class="kpi-value" id="avis-total" style="font-size:28px">0</div>
-                    <div class="kpi-sub">avis enregistrés</div>
+                    <div class="kpi-sub">avis enregistrés (max 3/joueur)</div>
                 </div>
                 <div class="kpi-card success">
                     <div class="kpi-label"><span class="material-symbols-outlined">chat</span> Avec commentaire</div>
                     <div class="kpi-value" id="avis-avec-commentaire" style="font-size:28px">0</div>
                     <div class="kpi-sub">avis avec texte</div>
                 </div>
+                <div class="kpi-card warning">
+                    <div class="kpi-label"><span class="material-symbols-outlined">group</span> Joueurs ayant donné un avis</div>
+                    <div class="kpi-value" id="avis-joueurs-count" style="font-size:28px">0</div>
+                    <div class="kpi-sub">joueurs distincts</div>
+                </div>
             </div>
-            <div class="table-wrap">
+
+            <!-- Graphe avis par période -->
+            <div style="padding:20px 24px 0">
+                <div class="freq-tabs" id="avis-tabs">
+                    <button class="avis-tab active" data-period="day">Aujourd'hui</button>
+                    <button class="avis-tab" data-period="week">Cette semaine</button>
+                    <button class="avis-tab" data-period="month">Ce mois</button>
+                    <button class="avis-tab" data-period="year">Cette année</button>
+                    <button class="avis-tab" data-period="all">Total</button>
+                </div>
+            </div>
+            <div class="freq-chart-wrap" style="margin:0 24px 20px">
+                <div class="freq-chart-title" id="avis-chart-title">Avis du jour par heure</div>
+                <div class="freq-bars-scroll-wrap" id="avis-bars-scroll-wrap">
+                    <div class="freq-bars" id="avis-bars">
+                        <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section par joueur : combien d'avis, dépliable -->
+            <div class="log-section-title" style="margin:0 0 0 0;border-top:1px solid var(--border-color)">
+                <span class="material-symbols-outlined">manage_accounts</span>
+                Avis par joueur (cliquer pour voir le détail)
+            </div>
+            <div id="avis-par-joueur-container">
+                <div class="loading-msg"><span class="material-symbols-outlined">autorenew</span>Chargement…</div>
+            </div>
+
+            <!-- Tableau global de tous les avis -->
+            <div class="log-section-title" style="border-top:1px solid var(--border-color)">
+                <span class="material-symbols-outlined">list_alt</span>
+                Tous les avis (liste complète)
+            </div>
+            <div class="table-wrap" style="margin-top:0">
                 <table class="leaderboard-table" id="avis-table">
                     <thead>
                         <tr>
