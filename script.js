@@ -2640,9 +2640,25 @@ function renderAvisTable(avis) {
             ? `<span style="color:var(--text-main)">${escapeHtml(a.commentaire)}</span>`
             : `<span style="color:var(--text-muted);font-style:italic">—</span>`;
 
+        // Avatar + drapeau du joueur (cherché dans allJoueurs)
+        const nomJoueur = a.joueur || a.name || 'Anonyme';
+        const joueurInfo = allJoueurs.find(j => (j.name || '').toLowerCase() === nomJoueur.toLowerCase());
+        const avatarHtml = joueurInfo?.avatarId
+            ? `<div class="admin-avatar" style="width:28px;height:28px;flex-shrink:0">${getAvatarImgAdmin(joueurInfo.avatarId)}</div>`
+            : `<div class="admin-avatar" style="width:28px;height:28px;flex-shrink:0"><span style="font-size:16px">🦕</span></div>`;
+        const flagHtml = joueurInfo?.countryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${joueurInfo.countryCode.toLowerCase()}.png" alt="${joueurInfo.countryName || joueurInfo.countryCode}" title="${joueurInfo.countryName || joueurInfo.countryCode}">`
+            : '';
+
         return `<tr>
             <td style="color:var(--text-muted);font-size:13px;text-align:center">${i + 1}</td>
-            <td style="font-weight:500">${escapeHtml(a.joueur || a.name || 'Anonyme')}</td>
+            <td>
+                <div class="player-cell">
+                    ${avatarHtml}
+                    ${flagHtml}
+                    <span style="font-weight:500">${escapeHtml(nomJoueur)}</span>
+                </div>
+            </td>
             <td><span class="avis-stars">${stars}</span></td>
             <td style="max-width:340px;word-break:break-word">${commentaire}</td>
             <td style="color:var(--text-muted);white-space:nowrap;font-size:13px">${formatDateTime(a.date || a.ts)}</td>
@@ -2889,18 +2905,25 @@ function renderNouveauProfilLog() {
         // Ancien profil
         const ancienNom = ev.ancienNom || ev.oldName || ev.previousName || ev.name || '—';
         const ancienAvatarId = ev.ancienAvatarId || ev.oldAvatarId || null;
-        const ancienAvatar = ancienAvatarId
-            ? `<span style="font-size:20px">${getAvatarEmojiAdmin(ancienAvatarId)}</span>`
-            : `<span style="font-size:20px">🦕</span>`;
+        const ancienAvatarHtml = ancienAvatarId
+            ? `<div class="admin-avatar" style="display:inline-flex">${getAvatarImgAdmin(ancienAvatarId)}</div>`
+            : `<div class="admin-avatar" style="display:inline-flex"><span style="font-size:20px">🦕</span></div>`;
+
+        // Ancien profil — drapeau (pays spécifique à l'ancien profil)
+        const ancienCountryCode = ev.ancienCountryCode || ev.oldCountryCode || ev.previousCountryCode || null;
+        const ancienCountryName = ev.ancienCountryName || ev.oldCountryName || ev.previousCountryName || ancienCountryCode || '';
+        const ancienFlagHtml = ancienCountryCode
+            ? `<img class="player-flag" src="https://flagcdn.com/w40/${ancienCountryCode.toLowerCase()}.png" alt="${ancienCountryName}" title="${ancienCountryName}">`
+            : '';
 
         // Nouveau profil
         const nouveauNom = ev.nouveauNom || ev.newName || ev.nomNouveau || '—';
         const nouveauAvatarId = ev.nouveauAvatarId || ev.newAvatarId || ev.avatarId || null;
-        const nouveauAvatar = nouveauAvatarId
-            ? `<span style="font-size:20px">${getAvatarEmojiAdmin(nouveauAvatarId)}</span>`
-            : `<span style="font-size:20px">🦕</span>`;
+        const nouveauAvatarHtml = nouveauAvatarId
+            ? `<div class="admin-avatar" style="display:inline-flex">${getAvatarImgAdmin(nouveauAvatarId)}</div>`
+            : `<div class="admin-avatar" style="display:inline-flex"><span style="font-size:20px">🦕</span></div>`;
 
-        // Pays
+        // Pays (colonne séparée)
         const flagHtml = ev.countryCode
             ? `<img class="player-flag" src="https://flagcdn.com/w40/${ev.countryCode.toLowerCase()}.png" alt="${ev.countryName || ev.countryCode}" title="${ev.countryName || ev.countryCode}">`
             : '';
@@ -2912,7 +2935,8 @@ function renderNouveauProfilLog() {
             <td style="color:var(--text-muted);font-size:12px;text-align:center">${rank}</td>
             <td>
                 <div class="profil-transition-cell">
-                    <div class="admin-avatar" style="display:inline-flex">${ancienAvatar}</div>
+                    ${ancienAvatarHtml}
+                    ${ancienFlagHtml}
                     <div>
                         <strong style="font-size:13px">${escapeHtml(ancienNom)}</strong>
                         ${ev.ancienPin || ev.oldPin ? `<div style="font-size:11px;color:var(--text-muted)">PIN : ••••</div>` : ''}
@@ -2922,7 +2946,7 @@ function renderNouveauProfilLog() {
             <td>
                 <div class="profil-transition-cell">
                     <span class="material-symbols-outlined profil-transition-arrow">arrow_forward</span>
-                    <div class="admin-avatar" style="display:inline-flex">${nouveauAvatar}</div>
+                    ${nouveauAvatarHtml}
                     <div>
                         <strong style="font-size:13px;color:var(--success)">${escapeHtml(nouveauNom)}</strong>
                         <div style="font-size:11px;color:var(--text-muted)">Nouveau profil</div>
